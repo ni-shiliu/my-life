@@ -29,8 +29,9 @@ jobs:
 
       - name: Generate SVG from PlantUML
         run: |
-          shopt -s globstar
-          plantuml -tsvg -charset UTF-8 doc/**/*.puml
+          find doc -name '*.puml' -exec plantuml -tsvg -charset UTF-8 {} +
+          echo "Generated SVG files:"
+          find doc -name '*.svg' -ls
 
       - name: Commit generated SVGs
         if: github.event_name == 'push'
