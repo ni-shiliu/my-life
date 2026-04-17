@@ -1,0 +1,222 @@
+@startuml
+skinparam sequenceMessageAlign center
+skinparam backgroundColor #FAFAFA
+skinparam participant {
+BackgroundColor #E8F4FD
+BorderColor #2980B9
+FontColor #2C3E50
+}
+skinparam sequence {
+ArrowColor #2980B9
+LifeLineBorderColor #2980B9
+LifeLineBackgroundColor #EBF5FB
+GroupBorderColor #E67E22
+GroupBackgroundColor #FEF9E7
+DividerBackgroundColor #D5F5E3
+DividerBorderColor #27AE60
+}
+hide footbox
+
+actor 学生 as User
+participant "WebSocket\nController" as WS
+participant "ChatService" as CS
+participant "HarnessRegistry" as HR
+participant "TeacherHarness" as TH
+participant "ReActAgent\n(AgentScope SDK)" as Agent
+participant "PlanNotebook\n(SDK内置)" as Plan
+database "MySQL" as DB
+database "向量库\n(Qdrant)" as VDB
+
+title neil-edu 完整聊天链路
+
+== 1. 请求入口与消息持久化 ==
+
+User -> WS : SEND /app/chat/1\n{"message": "..."}
+WS -> CS : chat(userId=42, agentId=1, message)
+CS -> DB : messageRepo.save("user", message)\n【入口持久化】防消息丢失
+CS -> HR : getOrCreate("42_1")
+
+== 2. Harness 生命周期管理 ==
+
+alt Harness 不存在（首次或被回收后重连）
+    HR -> DB : 加载最近20条消息 (Layer 1)
+    HR -> DB : 加载 StudentProfile (Layer 2)
+    HR -> DB : 加载 TeachingPlan (Layer 3)
+    note right of HR
+    构建个性化 sysPrompt：
+    "你是小明老师，使用苏教版
+    薄弱点：乘法进位
+    当前进度：三位数乘法第2课时"
+    end note
+    HR -> HR : new AutoContextMemory()\nmemory.addMessage(历史×20)
+    HR -> HR : new ReActAgent(\n  sysPrompt, memory,\n  knowledge, toolkit,\n  planNotebook)
+    HR --> CS : TeacherHarness（新建）
+else Harness 已存在（复用）
+    HR --> CS : TeacherHarness（复用）
+end
+
+== 3. Harness 空闲回收（后台定时检查） ==
+
+note over HR
+空闲回收策略：
+每 30min 扫描 lastActiveAt
+超过 30min 未活跃 → 回收前持久化：
+  ① PlanNotebook 状态 → MySQL (Layer 3)
+  ② AutoContextMemory 摘要 → MySQL
+  ③ 释放 Agent 资源
+回收后下次请求触发重新创建（走上方 alt 分支）
+end note
+
+== 4. Agent 对话循环 ==
+
+CS -> TH : chat(message)
+activate TH
+note left of TH : lock.lock()\nlastActiveAt = now()
+
+TH -> Agent : call(userMsg)
+activate Agent
+
+note over Agent
+LLM 可用工具（平等呈现，LLM 自主选择）：
+[calculate] [retrieve_knowledge]
+[updateStudentProfile] [advanceTeachingPlan]
+[create_plan] [finish_subtask] [finish_plan] ...
+end note
+
+loop ReAct 循环（每轮 = 1次LLM调用，上限 maxIterations=20）
+
+    Agent -> Agent : Step 1a: micro_compact\n静默替换旧工具结果为占位符\n例: "[retrieve_knowledge结果已压缩]"\n节省 token，用户无感知\n注：信息丢失可接受，Agent 会重新检索
+
+    Agent -> Agent : Step 1b: auto_compact\nAutoContextMemory 检查消息数\n超30条 → 保留最近10条 + LLM摘要\n摘要同步存盘 MySQL，供 Harness 回收后重连使用
+
+    Agent -> Agent : Step 1c: 催促提醒检查\n若连续3轮未调用 advanceTeachingPlan\n或 finish_subtask，注入 <reminder>\n"请推进教学计划或完成当前子任务"
+
+    Agent -> Agent : Step 2: 调用 LLM（流式）\n传入完整对话历史 + sysPrompt
+
+    alt LLM 调用异常
+        Agent -> Agent : 超时/限流 → 重试(最多3次，指数退避)\n重试失败 → 返回错误提示，退出循环
+    end
+
+    Agent -> Agent : Step 3: 解析响应\n纯 TextBlock？→ 流式推送 + 跳到 Step 6\nToolUseBlock？→ 继续 Step 4
+
+    alt Step 4+5: 执行工具，结果追加到对话历史
+
+        opt 工具 = calculate
+            Agent -> Agent : calculate(expression)
+            Agent -> Agent : Step 5: 计算结果追加到对话历史
+        end
+
+        opt 工具 = retrieve_knowledge
+            Agent -> Agent : Step 4a: 参数校验\nquery 长度≤200，无注入模式\n校验失败 → 返回错误消息，Agent 重新决策
+            Agent -> VDB : retrieve_knowledge(query)
+            activate VDB
+            VDB -> VDB : Embedding 向量化\n(text-embedding-v3, 1024维)
+            VDB -> VDB : 相似度检索 top-3\nscoreThreshold=0.4, agentId 隔离
+            alt 有匹配结果
+                VDB --> Agent : 相关教材段落
+            else 无匹配结果（score 全 < 0.4）
+                VDB --> Agent : 空结果
+                note right of Agent : Agent 自行决定：\n基于已有知识回答\n或告知学生该内容暂无教材
+            end
+            deactivate VDB
+            Agent -> Agent : Step 5: 检索结果追加到对话历史
+        end
+
+        opt 工具 = create_plan
+            Agent -> Plan : create_plan(subtasks)
+            Plan --> Agent : 计划已创建
+            Agent --> User : 展示计划，询问确认
+            User -> Agent : 确认 / 拒绝 / 要求修改
+            alt 用户确认执行
+                loop 逐个子任务（同一时刻仅1个 in_progress）
+                    Agent -> Agent : Step 1-3: 压缩 → LLM调用 → 解析
+                    Agent -> Plan : update_subtask_state / finish_subtask
+                    Plan -> DB : 同步写 edu_teaching_plan (Layer 3)\n确保持久化，防 Harness 回收丢失
+                    alt DB 写入失败
+                        DB --> Agent : 写入异常
+                        Agent -> Agent : 重试1次，仍失败则标记子任务为 pending\n下次可重新执行，不阻塞教学
+                    end
+                    opt 需要检索教材
+                        Agent -> VDB : retrieve_knowledge(query)
+                        VDB --> Agent : 教材内容
+                    end
+                    Agent -> Agent : Step 5: 子任务结果追加到对话历史
+                end
+                Agent -> Plan : finish_plan
+                Plan -> DB : 同步写 edu_teaching_plan (Layer 3)
+                Agent -> Agent : Step 5: 计划完成追加到对话历史
+            else 用户拒绝或要求修改
+                Agent -> Plan : 放弃当前计划 / 修改后重新提交
+                Agent -> Agent : Step 5: 结果追加到对话历史\nAgent 根据反馈调整或放弃
+            end
+        end
+
+        opt 工具 = updateStudentProfile
+            Agent -> DB : 写 edu_student_profile (Layer 2)
+            alt DB 写入成功
+                DB --> Agent : OK
+            else DB 写入失败
+                DB --> Agent : 异常
+                Agent -> Agent : 记录日志，不影响对话继续\n画像更新可下次补写
+            end
+            Agent -> Agent : Step 5: 结果追加到对话历史
+        end
+
+        opt 工具 = advanceTeachingPlan
+            Agent -> DB : 写 edu_teaching_plan (Layer 3)
+            DB --> Agent : OK / 异常(同上降级处理)
+            Agent -> Agent : Step 5: 结果追加到对话历史
+            note right of Agent
+            推进后自动提示：
+            sysPrompt 中当前进度已更新
+            Agent 下轮可主动 retrieve_knowledge
+            加载下一课内容
+            end note
+        end
+
+    else Step 6: 无新工具调用 → 退出循环
+        Agent -> Agent : Final Answer 已生成
+    end
+
+    note right of Agent
+        Step 6 判断：
+        有 ToolUseBlock → 回到 Step 1 继续
+        无 ToolUseBlock → 退出循环返回结果
+        达到 maxIterations → 强制退出
+        stop_reason = "max_tokens" → 强制退出并提示上下文不足
+    end note
+
+end
+
+== 5. 流式响应推送 ==
+
+Agent -> Agent : 收集 Final Answer (TextBlock)
+loop 流式输出每个 TextBlock
+    Agent -> TH : onTextBlock(textChunk)
+    TH -> CS : streamChunk(textChunk)
+    CS -> DB : messageRepo.append("assistant", textChunk)\n【实时持久化】
+    CS -> WS : streamChunk(textChunk)
+    WS -> User : 实时推送文本片段
+end
+
+Agent --> TH : reply (完成信号)
+deactivate Agent
+
+TH --> CS : reply (完成)
+deactivate TH
+
+CS --> WS : reply (流结束)
+WS --> User : 流结束标记
+
+== 6. 学生中断处理 ==
+
+note over WS, CS
+学生可在 Agent 循环中发送新消息（打断）：
+  WS 收到新消息 → CS 检查 TH.lock 状态
+  若 TH 正在执行 → 排队等待当前轮完成
+  当前轮完成后 → 检查新消息是否使原任务失效
+  若失效 → 丢弃原方向，以新消息重新进入循环
+  若不失效 → 新消息追加到队列，当前任务继续
+end note
+
+@enduml
