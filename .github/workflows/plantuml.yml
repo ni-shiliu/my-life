@@ -4,12 +4,8 @@ on:
   push:
     branches: [main]
     paths:
+      - 'doc/**.puml'
       - 'doc/**/*.puml'
-      - '.github/workflows/plantuml.yml'
-  pull_request:
-    paths:
-      - 'doc/**/*.puml'
-      - '.github/workflows/plantuml.yml'
 
 concurrency:
   group: plantuml-${{ github.ref }}
@@ -27,11 +23,26 @@ jobs:
       - name: Install PlantUML and CJK fonts
         run: sudo apt-get update && sudo apt-get install -y fonts-noto-cjk plantuml
 
-      - name: Generate SVG from PlantUML
+      - name: Get changed .puml files
+        id: changed
         run: |
-          find doc -name '*.puml' -exec plantuml -tsvg -charset UTF-8 {} +
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            FILES=$(git diff --name-only --diff-filter=ACM origin/${{ github.base_ref }} -- 'doc/**.puml')
+          else
+            FILES=$(git diff --name-only --diff-filter=ACM HEAD~1 -- 'doc/**.puml')
+          fi
+          echo "files=$FILES" >> "$GITHUB_OUTPUT"
+          echo "Changed .puml files:"
+          echo "$FILES"
+
+      - name: Generate SVG from PlantUML
+        if: steps.changed.outputs.files != ''
+        run: |
+          echo "$FILES" | xargs plantuml -tsvg -charset UTF-8
           echo "Generated SVG files:"
-          find doc -name '*.svg' -ls
+          find doc -name '*.svg' -newer HEAD -ls
+        env:
+          FILES: ${{ steps.changed.outputs.files }}
 
       - name: Commit generated SVGs
         if: github.event_name == 'push'
