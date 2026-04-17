@@ -5,9 +5,11 @@ on:
     branches: [main]
     paths:
       - 'doc/**/*.puml'
+      - '.github/workflows/plantuml.yml'
   pull_request:
     paths:
       - 'doc/**/*.puml'
+      - '.github/workflows/plantuml.yml'
 
 concurrency:
   group: plantuml-${{ github.ref }}
