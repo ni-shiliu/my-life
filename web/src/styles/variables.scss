@@ -1,0 +1,30 @@
+// 品牌色
+$brand-primary: #667eea;
+$brand-secondary: #764ba2;
+$brand-gradient: linear-gradient(135deg, $brand-primary, $brand-secondary);
+
+// 文字色
+$text-primary: #1a1a2e;
+$text-secondary: #6c757d;
+$text-placeholder: #adb5bd;
+
+// 边框色
+$border-default: #dee2e6;
+$border-focus: $brand-primary;
+$border-error: #dc3545;
+$border-success: #28a745;
+
+// 功能色
+$color-error: #dc3545;
+$color-success: #28a745;
+$color-error-bg: #fee2e2;
+$color-success-bg: #dcfce7;
+
+// 间距与圆角
+$radius-sm: 8px;
+$radius-lg: 16px;
+$input-height: 48px;
+$button-height: 48px;
+$card-shadow: 0 20px 60px rgba(0, 0, 0, 0.1);
+$focus-shadow: 0 0 0 3px rgba(102, 126, 234, 0.25);
+$hover-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
