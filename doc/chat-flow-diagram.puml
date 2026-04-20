@@ -27,7 +27,7 @@ participant "PlanNotebook\n(SDK内置)" as Plan
 database "MySQL" as DB
 database "向量库\n(Qdrant)" as VDB
 
-title neil-edu 完整聊天链路
+title my-life 完整聊天链路
 
 == 1. 请求入口与消息持久化 ==
 
