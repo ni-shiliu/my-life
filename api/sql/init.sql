@@ -1,5 +1,8 @@
+-- 数据库
+CREATE DATABASE my_life DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;
+
 -- 用户表
-CREATE TABLE `ml_user`
+CREATE TABLE IF NOT EXISTS `ml_user`
 (
     `id`                BIGINT       NOT NULL AUTO_INCREMENT COMMENT '主键ID',
     `phone`             VARCHAR(20)  NOT NULL COMMENT '手机号（唯一）',
