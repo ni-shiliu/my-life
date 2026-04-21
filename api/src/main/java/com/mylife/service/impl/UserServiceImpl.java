@@ -153,6 +153,19 @@ public class UserServiceImpl implements IUserService {
         loginFailMap.remove(phone);
     }
 
+    @Override
+    public UserDTO getUserInfo(Long userId) {
+        UserDO userDO = userMapper.selectById(userId);
+        if (userDO == null || YesNoEnum.YES.getValue().equals(userDO.getIsDeleted())) {
+            throw new BizException(ErrorCode.PARAM_ILLEGAL.getCode(), "用户不存在");
+        }
+        UserDTO dto = new UserDTO();
+        dto.setUserId(userDO.getId());
+        dto.setPhone(PhoneUtils.desensitize(userDO.getPhone()));
+        dto.setNickName(userDO.getNickName());
+        return dto;
+    }
+
     private UserDTO buildUserDTO(UserDO userDO, String token) {
         UserDTO dto = new UserDTO();
         dto.setUserId(userDO.getId());

@@ -7,10 +7,8 @@ import com.mylife.dto.UserSaveDTO;
 import com.mylife.service.IUserService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.security.core.Authentication;
+import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/v1/user")
@@ -27,5 +25,11 @@ public class UserController {
     @PostMapping("/login")
     public BaseResult<UserDTO> login(@Valid @RequestBody UserLoginDTO loginDTO) {
         return BaseResult.success(userService.login(loginDTO));
+    }
+
+    @GetMapping("/info")
+    public BaseResult<UserDTO> info(Authentication authentication) {
+        Long userId = (Long) authentication.getPrincipal();
+        return BaseResult.success(userService.getUserInfo(userId));
     }
 }

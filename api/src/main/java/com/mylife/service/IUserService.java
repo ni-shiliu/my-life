@@ -9,4 +9,6 @@ public interface IUserService {
     UserDTO save(UserSaveDTO saveDTO);
 
     UserDTO login(UserLoginDTO loginDTO);
+
+    UserDTO getUserInfo(Long userId);
 }

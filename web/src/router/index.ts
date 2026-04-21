@@ -21,6 +21,12 @@ const router = createRouter({
       name: 'Home',
       component: () => import('@/views/home/HomeView.vue'),
       meta: { requiresAuth: true }
+    },
+    {
+      path: '/agent/:id',
+      name: 'AgentEdit',
+      component: () => import('@/views/agent/AgentEditView.vue'),
+      meta: { requiresAuth: true }
     }
   ]
 })

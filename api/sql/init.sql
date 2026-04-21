@@ -1,3 +1,4 @@
+-- 用户表
 CREATE TABLE `ml_user`
 (
     `id`                BIGINT       NOT NULL AUTO_INCREMENT COMMENT '主键ID',
@@ -22,3 +23,24 @@ CREATE TABLE `ml_user`
     ENGINE = InnoDB
     DEFAULT CHARACTER SET = utf8mb4
     COMMENT = '用户表';
+
+-- Agent表
+CREATE TABLE IF NOT EXISTS `ml_agent` (
+    `id` BIGINT NOT NULL AUTO_INCREMENT,
+    `user_id` BIGINT NOT NULL,
+    `name` VARCHAR(64) NOT NULL,
+    `description` VARCHAR(256) DEFAULT NULL,
+    `icon_index` INT DEFAULT 0,
+    `color` VARCHAR(32) DEFAULT '#6366f1',
+    `system_prompt` TEXT DEFAULT NULL,
+    `knowledge_base_id` BIGINT DEFAULT NULL,
+    `status` VARCHAR(16) NOT NULL DEFAULT 'DRAFT',
+    `is_deleted` CHAR(1) NOT NULL DEFAULT 'N',
+    `gmt_created` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `creator` VARCHAR(64) DEFAULT '',
+    `gmt_modified` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    `modifier` VARCHAR(64) DEFAULT '',
+    PRIMARY KEY (`id`),
+    INDEX `idx_user_id` (`user_id`),
+    UNIQUE INDEX `uniq_user_name` (`user_id`, `name`, `is_deleted`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
