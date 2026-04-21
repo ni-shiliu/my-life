@@ -29,3 +29,5 @@ replay_pid*
 
 
 /web/node_modules/
+/web/dist/assets
+

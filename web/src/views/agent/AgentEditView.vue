@@ -52,36 +52,6 @@
             <p class="field-hint">关联知识库后，智能体可检索相关文档回答问题</p>
           </div>
 
-          <div class="field">
-            <label class="field-label">图标</label>
-            <div class="icon-picker">
-              <button
-                v-for="i in iconCount"
-                :key="i"
-                :class="['icon-option', { selected: form.iconIndex === i - 1 }]"
-                @click="form.iconIndex = i - 1"
-              >
-                <component :is="renderIcon(i - 1)" />
-              </button>
-            </div>
-          </div>
-
-          <div class="field">
-            <label class="field-label">颜色</label>
-            <div class="color-picker">
-              <button
-                v-for="c in colorOptions"
-                :key="c"
-                :class="['color-option', { selected: form.color === c }]"
-                :style="{ background: c }"
-                @click="form.color = c"
-              >
-                <svg v-if="form.color === c" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3">
-                  <polyline points="20 6 9 17 4 12"/>
-                </svg>
-              </button>
-            </div>
-          </div>
         </div>
 
         <div class="form-footer">
@@ -186,10 +156,6 @@ const renderIcon = (index: number, size = 20) => {
   }
   return (icons[index] ?? icons[0])()
 }
-
-const iconCount = 8
-
-const colorOptions = ['#6366f1', '#059669', '#d946ef', '#2563eb', '#0891b2', '#dc2626', '#ca8a04', '#7c3aed']
 
 const router = useRouter()
 const route = useRoute()
@@ -629,64 +595,6 @@ $transition: 150ms cubic-bezier(0.4, 0, 0.2, 1);
   margin-top: 4px;
   font-size: 12px;
   color: $text-3;
-}
-
-// ── Icon Picker ──
-.icon-picker {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.icon-option {
-  width: 44px;
-  height: 44px;
-  border: 2px solid $border;
-  border-radius: $radius-sm;
-  background: $surface;
-  color: $text-2;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  transition: border-color $transition, background $transition, color $transition;
-
-  &:hover {
-    border-color: $primary;
-    color: $primary;
-  }
-
-  &.selected {
-    border-color: $primary;
-    background: $primary-soft;
-    color: $primary;
-  }
-}
-
-// ── Color Picker ──
-.color-picker {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.color-option {
-  width: 36px;
-  height: 36px;
-  border: 2px solid transparent;
-  border-radius: $radius-sm;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  transition: transform $transition, border-color $transition;
-
-  &:hover { transform: scale(1.1); }
-
-  &.selected {
-    border-color: $text-1;
-    transform: scale(1.1);
-  }
 }
 
 // ── Responsive ──

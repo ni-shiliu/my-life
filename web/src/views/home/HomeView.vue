@@ -199,6 +199,22 @@
                     </button>
                   </div>
                 </div>
+                <div class="field">
+                  <label class="field-label">颜色</label>
+                  <div class="color-picker">
+                    <button
+                      v-for="c in colors"
+                      :key="c"
+                      :class="['color-option', { selected: newAgent.color === c }]"
+                      :style="{ background: c }"
+                      @click="newAgent.color = c"
+                    >
+                      <svg v-if="newAgent.color === c" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3">
+                        <polyline points="20 6 9 17 4 12"/>
+                      </svg>
+                    </button>
+                  </div>
+                </div>
               </div>
               <div class="dialog-foot">
                 <button class="btn-ghost" @click="showCreateDialog = false">取消</button>
@@ -268,6 +284,22 @@
                       @click="editForm.iconIndex = i - 1"
                     >
                       <component :is="renderIcon(i - 1)" />
+                    </button>
+                  </div>
+                </div>
+                <div class="field">
+                  <label class="field-label">颜色</label>
+                  <div class="color-picker">
+                    <button
+                      v-for="c in colors"
+                      :key="c"
+                      :class="['color-option', { selected: editForm.color === c }]"
+                      :style="{ background: c }"
+                      @click="editForm.color = c"
+                    >
+                      <svg v-if="editForm.color === c" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3">
+                        <polyline points="20 6 9 17 4 12"/>
+                      </svg>
                     </button>
                   </div>
                 </div>
@@ -394,7 +426,8 @@ const tabs = [
 const newAgent = ref({
   name: '',
   description: '',
-  iconIndex: 0
+  iconIndex: 0,
+  color: '#6366f1'
 })
 
 const editForm = ref({
@@ -433,9 +466,9 @@ const createAgent = async () => {
       name: newAgent.value.name,
       description: newAgent.value.description || '',
       iconIndex: newAgent.value.iconIndex,
-      color: colors[Math.floor(Math.random() * colors.length)]
+      color: newAgent.value.color
     })
-    newAgent.value = { name: '', description: '', iconIndex: 0 }
+    newAgent.value = { name: '', description: '', iconIndex: 0, color: '#6366f1' }
     showCreateDialog.value = false
   } finally {
     creating.value = false
@@ -1073,6 +1106,32 @@ $transition: 150ms cubic-bezier(0.4, 0, 0.2, 1);
     border-color: $primary;
     background: $primary-soft;
     color: $primary;
+  }
+}
+
+// ── Color Picker ──
+.color-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.color-option {
+  width: 36px;
+  height: 36px;
+  border: 2px solid transparent;
+  border-radius: $radius-sm;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: transform $transition, border-color $transition;
+
+  &:hover { transform: scale(1.1); }
+
+  &.selected {
+    border-color: $text-1;
+    transform: scale(1.1);
   }
 }
 
