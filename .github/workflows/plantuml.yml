@@ -44,7 +44,7 @@ jobs:
         run: |
           echo "$FILES" | xargs plantuml -tsvg -charset UTF-8
           echo "Generated SVG files:"
-          find doc -name '*.svg' -newer HEAD -ls
+          find doc -name '*.svg' -type f
         env:
           FILES: ${{ steps.changed.outputs.files }}
 
