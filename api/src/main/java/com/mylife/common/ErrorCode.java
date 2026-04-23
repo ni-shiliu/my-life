@@ -16,6 +16,7 @@ public enum ErrorCode {
     TOKEN_INVALID("TOKEN_INVALID", "无效的Token"),
     RATE_LIMITED("RATE_LIMITED", "请求过于频繁，请稍后再试"),
     PARAM_ILLEGAL("PARAM_ILLEGAL", "参数校验失败"),
+    LLM_ERROR("LLM_ERROR", "AI服务暂时不可用，请稍后重试"),
     SYSTEM_ERROR("SYSTEM_ERROR", "系统异常");
 
     private final String code;

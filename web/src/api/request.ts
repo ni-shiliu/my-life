@@ -22,15 +22,27 @@ request.interceptors.request.use((config: InternalAxiosRequestConfig) => {
 request.interceptors.response.use(
   (response) => {
     const data = response.data
-    if (data?.code && TOKEN_ERROR_CODES.includes(data.code)) {
-      handleAuthExpired()
-      return Promise.reject(new Error(data.message || '登录已过期'))
+    // 只有当响应体包含 code 字段时才走业务码判断
+    if (data && 'code' in data) {
+      if (data.code === '0' || data.code === 0) {
+        return response
+      }
+      if (TOKEN_ERROR_CODES.includes(data.code)) {
+        handleAuthExpired()
+        return Promise.reject(new Error(data.message || '登录已过期'))
+      }
+      const msg = data.message || '请求失败'
+      showToast(msg, 'error')
+      return Promise.reject(new Error(msg))
     }
     return response
   },
   (error) => {
     if (error.response?.status === 401) {
       handleAuthExpired()
+    } else {
+      const msg = error.response?.data?.message || error.message || '网络异常，请稍后重试'
+      showToast(msg, 'error')
     }
     return Promise.reject(error)
   }

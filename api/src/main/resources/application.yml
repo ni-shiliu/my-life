@@ -26,3 +26,23 @@ jwt:
 login:
   max-fail-count: 5
   lock-minutes: 30
+
+llm:
+  api-key: xxx
+  model: xxx
+  max-tokens: 2048
+  temperature: 0.7
+  max-iterations: 10
+
+guest:
+  token-expire-seconds: 1800
+  rate-limit-per-minute: 5
+
+harness:
+  idle-timeout-minutes: 30
+  idle-check-minutes: 30
+
+bailian:
+  access-key-id: xxx
+  access-key-secret: xxx
+  workspace-id: xxx

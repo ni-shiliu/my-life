@@ -8,7 +8,6 @@ import com.mylife.dto.UserLoginDTO;
 import com.mylife.dto.UserSaveDTO;
 import com.mylife.entity.UserDO;
 import com.mylife.enums.UserStatusEnum;
-import com.mylife.enums.YesNoEnum;
 import com.mylife.mapper.UserMapper;
 import com.mylife.security.JwtTokenProvider;
 import com.mylife.service.IUserService;
@@ -94,8 +93,7 @@ public class UserServiceImpl implements IUserService {
 
     private void checkPhoneUnique(String phone) {
         LambdaQueryWrapper<UserDO> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(UserDO::getPhone, phone)
-               .eq(UserDO::getIsDeleted, YesNoEnum.NO.getValue());
+        wrapper.eq(UserDO::getPhone, phone);
         long count = userMapper.selectCount(wrapper);
         if (count > 0) {
             throw new BizException(ErrorCode.USER_PHONE_EXISTS.getCode(), ErrorCode.USER_PHONE_EXISTS.getMessage());
@@ -104,8 +102,7 @@ public class UserServiceImpl implements IUserService {
 
     private UserDO getUserByPhone(String phone) {
         LambdaQueryWrapper<UserDO> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(UserDO::getPhone, phone)
-               .eq(UserDO::getIsDeleted, YesNoEnum.NO.getValue());
+        wrapper.eq(UserDO::getPhone, phone);
         return userMapper.selectOne(wrapper);
     }
 
@@ -156,7 +153,7 @@ public class UserServiceImpl implements IUserService {
     @Override
     public UserDTO getUserInfo(Long userId) {
         UserDO userDO = userMapper.selectById(userId);
-        if (userDO == null || YesNoEnum.YES.getValue().equals(userDO.getIsDeleted())) {
+        if (userDO == null) {
             throw new BizException(ErrorCode.PARAM_ILLEGAL.getCode(), "用户不存在");
         }
         UserDTO dto = new UserDTO();

@@ -1,5 +1,5 @@
 export interface AgentDTO {
-  id: number
+  uuid: string
   name: string
   description: string
   iconIndex: number
@@ -11,7 +11,7 @@ export interface AgentDTO {
 }
 
 export interface AgentSaveDTO {
-  id?: number
+  uuid?: string
   name: string
   description: string
   iconIndex: number

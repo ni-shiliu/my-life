@@ -7,7 +7,7 @@ import lombok.Data;
 @Data
 public class AgentSaveDTO {
 
-    private Long id;
+    private String uuid;
 
     @NotBlank(message = "智能体名称不能为空")
     @Size(max = 64, message = "名称最多64个字符")

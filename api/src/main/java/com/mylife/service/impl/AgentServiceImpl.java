@@ -7,7 +7,6 @@ import com.mylife.dto.AgentDTO;
 import com.mylife.dto.AgentSaveDTO;
 import com.mylife.entity.AgentDO;
 import com.mylife.enums.AgentStatusEnum;
-import com.mylife.enums.YesNoEnum;
 import com.mylife.mapper.AgentMapper;
 import com.mylife.service.IAgentService;
 import lombok.RequiredArgsConstructor;
@@ -15,6 +14,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -27,35 +27,36 @@ public class AgentServiceImpl implements IAgentService {
     @Override
     public AgentDTO save(Long userId, AgentSaveDTO saveDTO) {
         AgentDO agentDO;
-        if (saveDTO.getId() != null) {
-            agentDO = getAndCheckOwner(userId, saveDTO.getId());
+        if (saveDTO.getUuid() != null) {
+            agentDO = getAndCheckOwner(userId, saveDTO.getUuid());
             updateFields(agentDO, saveDTO);
             agentMapper.updateById(agentDO);
         } else {
             agentDO = new AgentDO();
+            agentDO.setUuid(UUID.randomUUID().toString());
             agentDO.setUserId(userId);
             agentDO.setStatus(AgentStatusEnum.DRAFT);
             updateFields(agentDO, saveDTO);
             agentMapper.insert(agentDO);
         }
         log.info("智能体保存成功：{}", com.alibaba.fastjson2.JSON.toJSONString(
-                java.util.Map.of("agentId", agentDO.getId(), "userId", userId)
+                java.util.Map.of("agentId", agentDO.getId(), "uuid", agentDO.getUuid(), "userId", userId)
         ));
         return convertToDTO(agentDO);
     }
 
     @Override
-    public void delete(Long userId, Long agentId) {
-        AgentDO agentDO = getAndCheckOwner(userId, agentId);
-        agentMapper.deleteById(agentId);
+    public void delete(Long userId, String uuid) {
+        AgentDO agentDO = getAndCheckOwner(userId, uuid);
+        agentMapper.deleteById(agentDO.getId());
         log.info("智能体删除成功：{}", com.alibaba.fastjson2.JSON.toJSONString(
-                java.util.Map.of("agentId", agentId, "userId", userId)
+                java.util.Map.of("uuid", uuid, "userId", userId)
         ));
     }
 
     @Override
-    public AgentDTO get(Long userId, Long agentId) {
-        AgentDO agentDO = getAndCheckOwner(userId, agentId);
+    public AgentDTO get(Long userId, String uuid) {
+        AgentDO agentDO = getAndCheckOwner(userId, uuid);
         return convertToDTO(agentDO);
     }
 
@@ -63,7 +64,6 @@ public class AgentServiceImpl implements IAgentService {
     public List<AgentDTO> list(Long userId) {
         LambdaQueryWrapper<AgentDO> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(AgentDO::getUserId, userId)
-               .eq(AgentDO::getIsDeleted, YesNoEnum.NO.getValue())
                .orderByDesc(AgentDO::getGmtModified);
         return agentMapper.selectList(wrapper).stream()
                 .map(this::convertToDTO)
@@ -71,18 +71,21 @@ public class AgentServiceImpl implements IAgentService {
     }
 
     @Override
-    public void publish(Long userId, Long agentId) {
-        AgentDO agentDO = getAndCheckOwner(userId, agentId);
+    public void publish(Long userId, String uuid) {
+        AgentDO agentDO = getAndCheckOwner(userId, uuid);
         agentDO.setStatus(AgentStatusEnum.PUBLISHED);
         agentMapper.updateById(agentDO);
         log.info("智能体发布成功：{}", com.alibaba.fastjson2.JSON.toJSONString(
-                java.util.Map.of("agentId", agentId, "userId", userId)
+                java.util.Map.of("uuid", uuid, "userId", userId)
         ));
     }
 
-    private AgentDO getAndCheckOwner(Long userId, Long agentId) {
-        AgentDO agentDO = agentMapper.selectById(agentId);
-        if (agentDO == null || YesNoEnum.YES.getValue().equals(agentDO.getIsDeleted())) {
+    private AgentDO getAndCheckOwner(Long userId, String uuid) {
+        LambdaQueryWrapper<AgentDO> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(AgentDO::getUuid, uuid)
+               .last("LIMIT 1");
+        AgentDO agentDO = agentMapper.selectOne(wrapper);
+        if (agentDO == null) {
             throw new BizException(ErrorCode.PARAM_ILLEGAL.getCode(), "智能体不存在");
         }
         if (!agentDO.getUserId().equals(userId)) {
@@ -106,7 +109,7 @@ public class AgentServiceImpl implements IAgentService {
 
     private AgentDTO convertToDTO(AgentDO agentDO) {
         AgentDTO dto = new AgentDTO();
-        dto.setId(agentDO.getId());
+        dto.setUuid(agentDO.getUuid());
         dto.setName(agentDO.getName());
         dto.setDescription(agentDO.getDescription());
         dto.setIconIndex(agentDO.getIconIndex());

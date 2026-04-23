@@ -33,8 +33,9 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         if (StringUtils.hasText(token)) {
             try {
                 JwtClaims claims = jwtTokenProvider.validate(token);
+                LoginUser loginUser = new LoginUser(claims.getUserId());
                 UsernamePasswordAuthenticationToken authentication =
-                        new UsernamePasswordAuthenticationToken(claims.getUserId(), null, null);
+                        new UsernamePasswordAuthenticationToken(loginUser, null, null);
                 SecurityContextHolder.getContext().setAuthentication(authentication);
             } catch (BizException e) {
                 writeUnauthorizedResponse(response, e.getCode(), e.getMessage());

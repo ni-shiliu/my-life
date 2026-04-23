@@ -27,6 +27,12 @@ const router = createRouter({
       name: 'AgentEdit',
       component: () => import('@/views/agent/AgentEditView.vue'),
       meta: { requiresAuth: true }
+    },
+    {
+      path: '/chat/:agentId',
+      name: 'Chat',
+      component: () => import('@/views/chat/ChatView.vue'),
+      meta: { requiresAuth: false }
     }
   ]
 })

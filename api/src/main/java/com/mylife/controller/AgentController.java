@@ -3,10 +3,10 @@ package com.mylife.controller;
 import com.mylife.common.BaseResult;
 import com.mylife.dto.AgentDTO;
 import com.mylife.dto.AgentSaveDTO;
+import com.mylife.security.SecurityUtils;
 import com.mylife.service.IAgentService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -19,38 +19,29 @@ public class AgentController {
     private final IAgentService agentService;
 
     @PostMapping("/save")
-    public BaseResult<AgentDTO> save(@Valid @RequestBody AgentSaveDTO saveDTO,
-                                     Authentication authentication) {
-        Long userId = (Long) authentication.getPrincipal();
-        return BaseResult.success(agentService.save(userId, saveDTO));
+    public BaseResult<AgentDTO> save(@Valid @RequestBody AgentSaveDTO saveDTO) {
+        return BaseResult.success(agentService.save(SecurityUtils.getUserId(), saveDTO));
     }
 
     @DeleteMapping("/delete")
-    public BaseResult<Void> delete(@RequestParam Long id,
-                                    Authentication authentication) {
-        Long userId = (Long) authentication.getPrincipal();
-        agentService.delete(userId, id);
+    public BaseResult<Void> delete(@RequestParam String uuid) {
+        agentService.delete(SecurityUtils.getUserId(), uuid);
         return BaseResult.success(null);
     }
 
-    @GetMapping("/get/{id}")
-    public BaseResult<AgentDTO> get(@PathVariable Long id,
-                                     Authentication authentication) {
-        Long userId = (Long) authentication.getPrincipal();
-        return BaseResult.success(agentService.get(userId, id));
+    @GetMapping("/get/{uuid}")
+    public BaseResult<AgentDTO> get(@PathVariable String uuid) {
+        return BaseResult.success(agentService.get(SecurityUtils.getUserId(), uuid));
     }
 
     @PostMapping("/list")
-    public BaseResult<List<AgentDTO>> list(Authentication authentication) {
-        Long userId = (Long) authentication.getPrincipal();
-        return BaseResult.success(agentService.list(userId));
+    public BaseResult<List<AgentDTO>> list() {
+        return BaseResult.success(agentService.list(SecurityUtils.getUserId()));
     }
 
     @PostMapping("/publish")
-    public BaseResult<Void> publish(@RequestParam Long id,
-                                     Authentication authentication) {
-        Long userId = (Long) authentication.getPrincipal();
-        agentService.publish(userId, id);
+    public BaseResult<Void> publish(@RequestParam String uuid) {
+        agentService.publish(SecurityUtils.getUserId(), uuid);
         return BaseResult.success(null);
     }
 }

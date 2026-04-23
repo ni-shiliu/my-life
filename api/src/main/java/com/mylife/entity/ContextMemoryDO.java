@@ -1,37 +1,24 @@
 package com.mylife.entity;
 
 import com.baomidou.mybatisplus.annotation.*;
-import com.mylife.enums.AgentStatusEnum;
-import com.mylife.enums.YesNoEnum;
 import lombok.Data;
 
 import java.time.LocalDateTime;
 
 @Data
-@TableName("ml_agent")
-public class AgentDO {
+@TableName("ml_context_memory")
+public class ContextMemoryDO {
 
     @TableId(type = IdType.AUTO)
     private Long id;
 
-    private String uuid;
-
     private Long userId;
 
-    private String name;
+    private String agentUuid;
 
-    private String description;
+    private String content;
 
-    @TableField("icon_index")
-    private Integer iconIndex;
-
-    private String color;
-
-    private String systemPrompt;
-
-    private Long knowledgeBaseId;
-
-    private AgentStatusEnum status;
+    private Integer messageCount;
 
     @TableLogic
     private String isDeleted;

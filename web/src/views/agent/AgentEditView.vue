@@ -1,11 +1,32 @@
 <template>
   <div class="edit-view">
-    <!-- Header -->
-    <header class="edit-header">
-      <div class="header-inner">
-        <div class="header-left">
+    <!-- Top Bar: logo + user (same as home) -->
+    <header class="top-bar">
+      <div class="top-bar-inner">
+        <div class="top-bar-left">
+          <span class="logo-mark">M</span>
+          <span class="logo-text">my-life</span>
+        </div>
+        <div class="top-bar-right">
+          <div class="user-pill" @click="handleLogout">
+            <div class="user-avatar">{{ userAvatar }}</div>
+            <span class="user-name">{{ userStore.userInfo?.nickName || '用户' }}</span>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="logout-icon">
+              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+              <polyline points="16 17 21 12 16 7"/>
+              <line x1="21" y1="12" x2="9" y2="12"/>
+            </svg>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <!-- Sub Bar: back + title + publish -->
+    <header class="sub-bar">
+      <div class="sub-bar-inner">
+        <div class="sub-bar-left">
           <button class="btn-icon" @click="goBack" aria-label="返回">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <line x1="19" y1="12" x2="5" y2="12"/>
               <polyline points="12 19 5 12 12 5"/>
             </svg>
@@ -62,7 +83,16 @@
       </div>
 
       <!-- Right: Chat Preview -->
-      <div class="chat-panel">
+      <ChatPanel
+        v-if="agent?.uuid"
+        :agent-uuid="agent.uuid"
+        :agent-name="form.name"
+        :agent-color="form.color"
+        :scene="'EDIT'"
+        empty-text="保存后可开始对话"
+        class="chat-panel"
+      />
+      <div v-else class="chat-panel">
         <div class="chat-header">
           <div class="chat-agent-icon" :style="{ background: form.color || '#6366f1' }">
             <component :is="renderIcon(form.iconIndex ?? 0)" />
@@ -101,12 +131,15 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, h } from 'vue'
+import { ref, computed, onMounted, h } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
+import { useUserStore } from '@/stores/user'
+import { useAuth } from '@/composables/useAuth'
 import { useAgentStore } from '@/stores/agent'
 import { getAgentApi } from '@/api/agent'
 import { showToast } from '@/components/auth/toast-state'
 import type { AgentDTO } from '@/types/agent'
+import ChatPanel from '@/components/chat/ChatPanel.vue'
 
 // SVG Icon render helpers
 const svgProps = { viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', 'stroke-width': 1.5 }
@@ -159,7 +192,19 @@ const renderIcon = (index: number, size = 20) => {
 
 const router = useRouter()
 const route = useRoute()
+const userStore = useUserStore()
+const { logout } = useAuth()
 const agentStore = useAgentStore()
+
+const userAvatar = computed(() => {
+  const name = userStore.userInfo?.nickName || 'U'
+  return name.charAt(0).toUpperCase()
+})
+
+const handleLogout = async () => {
+  await logout()
+  router.push('/login')
+}
 
 const loading = ref(true)
 const saving = ref(false)
@@ -176,9 +221,9 @@ const form = ref({
 })
 
 onMounted(async () => {
-  const id = Number(route.params.id)
+  const uuid = route.params.id as string
   try {
-    const { data } = await getAgentApi(id)
+    const { data } = await getAgentApi(uuid)
     if (data?.data) {
       agent.value = data.data
       form.value = {
@@ -204,7 +249,7 @@ const handleSave = async () => {
   saving.value = true
   try {
     const saved = await agentStore.saveAgent({
-      id: agent.value?.id,
+      uuid: agent.value?.uuid,
       name: form.value.name,
       description: form.value.description,
       systemPrompt: form.value.systemPrompt,
@@ -225,7 +270,7 @@ const handlePublish = async () => {
   if (!agent.value || agent.value.status === 'PUBLISHED') return
   publishing.value = true
   try {
-    await agentStore.publishAgent(agent.value.id)
+    await agentStore.publishAgent(agent.value.uuid)
     agent.value = { ...agent.value, status: 'PUBLISHED' }
   } finally {
     publishing.value = false
@@ -261,15 +306,14 @@ $transition: 150ms cubic-bezier(0.4, 0, 0.2, 1);
   -webkit-font-smoothing: antialiased;
 }
 
-// ── Header ──
-.edit-header {
+// ── Top Bar (white, same as home) ──
+.top-bar {
   background: $surface;
-  border-bottom: 1px solid $border;
   height: 56px;
   flex-shrink: 0;
 }
 
-.header-inner {
+.top-bar-inner {
   max-width: 1400px;
   margin: 0 auto;
   height: 100%;
@@ -277,6 +321,101 @@ $transition: 150ms cubic-bezier(0.4, 0, 0.2, 1);
   align-items: center;
   justify-content: space-between;
   padding: 0 24px;
+}
+
+.top-bar-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.top-bar-right {
+  display: flex;
+  align-items: center;
+}
+
+.logo-mark {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  background: $primary;
+  color: $primary-text;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 14px;
+}
+
+.logo-text {
+  font-size: 15px;
+  font-weight: 600;
+  color: $text-1;
+  letter-spacing: -0.01em;
+}
+
+.user-pill {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 12px 4px 4px;
+  border-radius: 999px;
+  border: 1px solid $border;
+  background: $surface;
+  cursor: pointer;
+  transition: border-color $transition;
+
+  &:hover {
+    border-color: $danger;
+    .logout-icon { color: $danger; }
+  }
+}
+
+.user-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: $primary;
+  color: $primary-text;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  font-size: 12px;
+}
+
+.user-name {
+  font-size: 13px;
+  font-weight: 500;
+  color: $text-1;
+}
+
+.logout-icon {
+  color: $text-3;
+  transition: color $transition;
+}
+
+// ── Sub Bar (light gray, color diff instead of border) ──
+.sub-bar {
+  background: $bg;
+  height: 44px;
+  flex-shrink: 0;
+}
+
+.sub-bar-inner {
+  max-width: 1400px;
+  margin: 0 auto;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 24px;
+}
+
+.sub-bar-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 
 .header-left {
@@ -336,7 +475,6 @@ $transition: 150ms cubic-bezier(0.4, 0, 0.2, 1);
   width: 55%;
   display: flex;
   flex-direction: column;
-  border-right: 1px solid $border;
   background: $surface;
 }
 
@@ -348,8 +486,7 @@ $transition: 150ms cubic-bezier(0.4, 0, 0.2, 1);
 
 .form-footer {
   padding: 16px 32px;
-  border-top: 1px solid $border;
-  background: $surface;
+  background: $bg;
 }
 
 // ── Chat Panel ──
@@ -365,7 +502,6 @@ $transition: 150ms cubic-bezier(0.4, 0, 0.2, 1);
   align-items: center;
   gap: 12px;
   padding: 16px 24px;
-  border-bottom: 1px solid $border;
   background: $surface;
 }
 
@@ -423,7 +559,6 @@ $transition: 150ms cubic-bezier(0.4, 0, 0.2, 1);
 
 .chat-input-area {
   padding: 12px 24px 16px;
-  border-top: 1px solid $border;
   background: $surface;
 }
 
@@ -531,22 +666,22 @@ $transition: 150ms cubic-bezier(0.4, 0, 0.2, 1);
 .field-input {
   width: 100%;
   padding: 10px 12px;
-  border: 1px solid $border;
+  border: none;
   border-radius: $radius-sm;
   font-size: 14px;
   color: $text-1;
   outline: none;
-  background: $surface;
-  transition: border-color $transition;
+  background: $bg;
+  transition: box-shadow $transition;
 
-  &:focus { border-color: $primary; }
+  &:focus { box-shadow: 0 0 0 2px rgba($primary, 0.2); }
   &::placeholder { color: $text-3; }
 
   &.field-readonly {
     background: $bg;
     color: $text-2;
     cursor: default;
-    &:focus { border-color: $border; }
+    &:focus { box-shadow: none; }
   }
 }
 
@@ -565,17 +700,17 @@ $transition: 150ms cubic-bezier(0.4, 0, 0.2, 1);
 .field-select {
   width: 100%;
   padding: 10px 32px 10px 12px;
-  border: 1px solid $border;
+  border: none;
   border-radius: $radius-sm;
   font-size: 14px;
   color: $text-1;
   outline: none;
-  background: $surface;
+  background: $bg;
   appearance: none;
   cursor: pointer;
-  transition: border-color $transition;
+  transition: box-shadow $transition;
 
-  &:focus { border-color: $primary; }
+  &:focus { box-shadow: 0 0 0 2px rgba($primary, 0.2); }
 }
 
 .select-wrap {
@@ -605,8 +740,6 @@ $transition: 150ms cubic-bezier(0.4, 0, 0.2, 1);
 
   .form-panel {
     width: 100%;
-    border-right: none;
-    border-bottom: 1px solid $border;
     max-height: 60vh;
   }
 

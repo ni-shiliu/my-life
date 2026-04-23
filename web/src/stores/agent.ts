@@ -21,7 +21,7 @@ export const useAgentStore = defineStore('agent', () => {
     const { data } = await saveAgentApi(dto)
     const saved = data?.data ?? null
     if (saved) {
-      const idx = agents.value.findIndex(a => a.id === saved.id)
+      const idx = agents.value.findIndex(a => a.uuid === saved.uuid)
       if (idx >= 0) {
         agents.value[idx] = saved
       } else {
@@ -31,14 +31,14 @@ export const useAgentStore = defineStore('agent', () => {
     return saved
   }
 
-  async function deleteAgent(id: number) {
-    await deleteAgentApi(id)
-    agents.value = agents.value.filter(a => a.id !== id)
+  async function deleteAgent(uuid: string) {
+    await deleteAgentApi(uuid)
+    agents.value = agents.value.filter(a => a.uuid !== uuid)
   }
 
-  async function publishAgent(id: number) {
-    await publishAgentApi(id)
-    const agent = agents.value.find(a => a.id === id)
+  async function publishAgent(uuid: string) {
+    await publishAgentApi(uuid)
+    const agent = agents.value.find(a => a.uuid === uuid)
     if (agent) {
       agent.status = 'PUBLISHED'
     }

@@ -9,11 +9,11 @@ public interface IAgentService {
 
     AgentDTO save(Long userId, AgentSaveDTO saveDTO);
 
-    void delete(Long userId, Long agentId);
+    void delete(Long userId, String uuid);
 
-    AgentDTO get(Long userId, Long agentId);
+    AgentDTO get(Long userId, String uuid);
 
     List<AgentDTO> list(Long userId);
 
-    void publish(Long userId, Long agentId);
+    void publish(Long userId, String uuid);
 }

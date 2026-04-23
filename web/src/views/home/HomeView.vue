@@ -71,7 +71,7 @@
           </div>
 
           <div v-else class="agent-grid">
-            <div v-for="agent in agentStore.agents" :key="agent.id" class="agent-card" @click="goToEdit(agent)">
+            <div v-for="agent in agentStore.agents" :key="agent.uuid" class="agent-card" @click="goToEdit(agent)">
               <div class="card-icon" :style="{ background: agent.color || '#6366f1' }">
                 <component :is="renderIcon(agent.iconIndex ?? 0)" />
               </div>
@@ -431,7 +431,7 @@ const newAgent = ref({
 })
 
 const editForm = ref({
-  id: 0,
+  uuid: '',
   name: '',
   description: '',
   iconIndex: 0,
@@ -476,16 +476,16 @@ const createAgent = async () => {
 }
 
 const startChat = (agent: AgentDTO) => {
-  console.log('Start chat with:', agent)
+  router.push(`/chat/${agent.uuid}`)
 }
 
 const goToEdit = (agent: AgentDTO) => {
-  router.push(`/agent/${agent.id}`)
+  router.push(`/agent/${agent.uuid}`)
 }
 
 const openEditDialog = (agent: AgentDTO) => {
   editForm.value = {
-    id: agent.id,
+    uuid: agent.uuid,
     name: agent.name,
     description: agent.description || '',
     iconIndex: agent.iconIndex ?? 0,
@@ -499,7 +499,7 @@ const saveEditAgent = async () => {
   savingEdit.value = true
   try {
     await agentStore.saveAgent({
-      id: editForm.value.id,
+      uuid: editForm.value.uuid,
       name: editForm.value.name,
       description: editForm.value.description,
       iconIndex: editForm.value.iconIndex,
@@ -520,7 +520,7 @@ const doDelete = async () => {
   if (!deleteTarget.value) return
   deleting.value = true
   try {
-    await agentStore.deleteAgent(deleteTarget.value.id)
+    await agentStore.deleteAgent(deleteTarget.value.uuid)
     showDeleteDialog.value = false
     deleteTarget.value = null
   } finally {

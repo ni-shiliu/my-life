@@ -30,6 +30,7 @@ CREATE TABLE IF NOT EXISTS `ml_user`
 -- Agent表
 CREATE TABLE IF NOT EXISTS `ml_agent` (
     `id` BIGINT NOT NULL AUTO_INCREMENT,
+    `uuid` VARCHAR(36) NOT NULL COMMENT '对外唯一标识，替代自增ID',
     `user_id` BIGINT NOT NULL,
     `name` VARCHAR(64) NOT NULL,
     `description` VARCHAR(256) DEFAULT NULL,
@@ -44,6 +45,43 @@ CREATE TABLE IF NOT EXISTS `ml_agent` (
     `gmt_modified` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     `modifier` VARCHAR(64) DEFAULT '',
     PRIMARY KEY (`id`),
+    UNIQUE INDEX `uniq_uuid` (`uuid`),
     INDEX `idx_user_id` (`user_id`),
     UNIQUE INDEX `uniq_user_name` (`user_id`, `name`, `is_deleted`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 聊天消息表
+CREATE TABLE IF NOT EXISTS `ml_chat_message` (
+    `id`            BIGINT       NOT NULL AUTO_INCREMENT,
+    `user_id`       BIGINT       DEFAULT NULL COMMENT '用户ID，游客为NULL',
+    `agent_uuid`    VARCHAR(36)  NOT NULL COMMENT '智能体UUID',
+    `role`          VARCHAR(16)  NOT NULL COMMENT '角色：USER,ASSISTANT,SYSTEM,TOOL_RESULT',
+    `content`       TEXT         NOT NULL COMMENT '消息内容',
+    `tool_name`     VARCHAR(64)  DEFAULT NULL COMMENT '工具名称（TOOL_RESULT时使用）',
+    `scene`         VARCHAR(16)  NOT NULL DEFAULT 'PUBLISHED' COMMENT '场景：EDIT-编辑预览, PUBLISHED-发布后对话',
+    `is_deleted`    CHAR(1)      NOT NULL DEFAULT 'N' COMMENT '是否删除：Y-是，N-否',
+    `gmt_created`   DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `creator`       VARCHAR(64)  NOT NULL DEFAULT 'system' COMMENT '创建人',
+    `gmt_modified`  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    `modifier`      VARCHAR(64)  NOT NULL DEFAULT 'system' COMMENT '更新人',
+    PRIMARY KEY (`id`),
+    INDEX `idx_user_agent_created` (`user_id`, `agent_uuid`, `gmt_created`),
+    INDEX `idx_user_agent_scene` (`user_id`, `agent_uuid`, `scene`, `gmt_created`),
+    INDEX `idx_agent_uuid` (`agent_uuid`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='聊天消息表';
+
+-- 上下文记忆表
+CREATE TABLE IF NOT EXISTS `ml_context_memory` (
+    `id`              BIGINT       NOT NULL AUTO_INCREMENT,
+    `user_id`         BIGINT       NOT NULL COMMENT '用户ID',
+    `agent_uuid`      VARCHAR(36)  NOT NULL COMMENT '智能体UUID',
+    `content`         TEXT         NOT NULL COMMENT 'LLM生成的上下文记忆',
+    `message_count`   INT          NOT NULL DEFAULT 0 COMMENT '被压缩的消息数',
+    `is_deleted`      CHAR(1)      NOT NULL DEFAULT 'N' COMMENT '是否删除：Y-是，N-否',
+    `gmt_created`     DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `creator`         VARCHAR(64)  NOT NULL DEFAULT 'system' COMMENT '创建人',
+    `gmt_modified`    DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    `modifier`        VARCHAR(64)  NOT NULL DEFAULT 'system' COMMENT '更新人',
+    PRIMARY KEY (`id`),
+    INDEX `idx_user_agent` (`user_id`, `agent_uuid`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='上下文记忆表';
