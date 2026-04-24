@@ -19,6 +19,8 @@ public class AgentDTO {
 
     private Long knowledgeBaseId;
 
+    private String knowledgeBaseName;
+
     private String status;
 
     private String gmtModified;

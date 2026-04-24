@@ -6,6 +6,7 @@ export interface AgentDTO {
   color: string
   systemPrompt: string
   knowledgeBaseId: number | null
+  knowledgeBaseName?: string
   status: 'DRAFT' | 'PUBLISHED'
   gmtModified: string
 }

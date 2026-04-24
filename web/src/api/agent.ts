@@ -20,3 +20,7 @@ export function listAgentApi() {
 export function publishAgentApi(uuid: string) {
   return request.post<BaseResult<void>>('/v1/agent/publish', null, { params: { uuid } })
 }
+
+export function listPublishedAgentApi() {
+  return request.get<BaseResult<AgentDTO[]>>('/v1/agent/published')
+}

@@ -1,6 +1,5 @@
 import { ref } from 'vue'
 import { getGuestTokenApi } from '@/api/chat'
-import { getToken, setToken, clearToken } from '@/utils/storage'
 
 const GUEST_TOKEN_KEY = 'guest_token'
 

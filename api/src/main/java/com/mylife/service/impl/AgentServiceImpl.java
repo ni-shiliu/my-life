@@ -6,14 +6,17 @@ import com.mylife.common.ErrorCode;
 import com.mylife.dto.AgentDTO;
 import com.mylife.dto.AgentSaveDTO;
 import com.mylife.entity.AgentDO;
+import com.mylife.entity.KnowledgeBaseDO;
 import com.mylife.enums.AgentStatusEnum;
 import com.mylife.mapper.AgentMapper;
+import com.mylife.mapper.KnowledgeBaseMapper;
 import com.mylife.service.IAgentService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -23,6 +26,7 @@ import java.util.stream.Collectors;
 public class AgentServiceImpl implements IAgentService {
 
     private final AgentMapper agentMapper;
+    private final KnowledgeBaseMapper knowledgeBaseMapper;
 
     @Override
     public AgentDTO save(Long userId, AgentSaveDTO saveDTO) {
@@ -42,7 +46,8 @@ public class AgentServiceImpl implements IAgentService {
         log.info("智能体保存成功：{}", com.alibaba.fastjson2.JSON.toJSONString(
                 java.util.Map.of("agentId", agentDO.getId(), "uuid", agentDO.getUuid(), "userId", userId)
         ));
-        return convertToDTO(agentDO);
+        Map<Long, String> kbNameMap = buildKbNameMap(List.of(agentDO));
+        return convertToDTO(agentDO, kbNameMap);
     }
 
     @Override
@@ -57,7 +62,8 @@ public class AgentServiceImpl implements IAgentService {
     @Override
     public AgentDTO get(Long userId, String uuid) {
         AgentDO agentDO = getAndCheckOwner(userId, uuid);
-        return convertToDTO(agentDO);
+        Map<Long, String> kbNameMap = buildKbNameMap(List.of(agentDO));
+        return convertToDTO(agentDO, kbNameMap);
     }
 
     @Override
@@ -65,8 +71,22 @@ public class AgentServiceImpl implements IAgentService {
         LambdaQueryWrapper<AgentDO> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(AgentDO::getUserId, userId)
                .orderByDesc(AgentDO::getGmtModified);
-        return agentMapper.selectList(wrapper).stream()
-                .map(this::convertToDTO)
+        List<AgentDO> agents = agentMapper.selectList(wrapper);
+        Map<Long, String> kbNameMap = buildKbNameMap(agents);
+        return agents.stream()
+                .map(a -> convertToDTO(a, kbNameMap))
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    public List<AgentDTO> listPublished() {
+        LambdaQueryWrapper<AgentDO> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(AgentDO::getStatus, AgentStatusEnum.PUBLISHED)
+               .orderByDesc(AgentDO::getGmtModified);
+        List<AgentDO> agents = agentMapper.selectList(wrapper);
+        Map<Long, String> kbNameMap = buildKbNameMap(agents);
+        return agents.stream()
+                .map(a -> convertToDTO(a, kbNameMap))
                 .collect(Collectors.toList());
     }
 
@@ -107,7 +127,20 @@ public class AgentServiceImpl implements IAgentService {
         agentDO.setKnowledgeBaseId(saveDTO.getKnowledgeBaseId());
     }
 
-    private AgentDTO convertToDTO(AgentDO agentDO) {
+    private Map<Long, String> buildKbNameMap(List<AgentDO> agents) {
+        List<Long> kbIds = agents.stream()
+                .map(AgentDO::getKnowledgeBaseId)
+                .filter(java.util.Objects::nonNull)
+                .distinct()
+                .collect(Collectors.toList());
+        if (kbIds.isEmpty()) {
+            return Map.of();
+        }
+        List<KnowledgeBaseDO> kbList = knowledgeBaseMapper.selectBatchIds(kbIds);
+        return kbList.stream().collect(Collectors.toMap(KnowledgeBaseDO::getId, KnowledgeBaseDO::getName));
+    }
+
+    private AgentDTO convertToDTO(AgentDO agentDO, Map<Long, String> kbNameMap) {
         AgentDTO dto = new AgentDTO();
         dto.setUuid(agentDO.getUuid());
         dto.setName(agentDO.getName());
@@ -116,6 +149,8 @@ public class AgentServiceImpl implements IAgentService {
         dto.setColor(agentDO.getColor());
         dto.setSystemPrompt(agentDO.getSystemPrompt());
         dto.setKnowledgeBaseId(agentDO.getKnowledgeBaseId());
+        dto.setKnowledgeBaseName(agentDO.getKnowledgeBaseId() != null
+                ? kbNameMap.getOrDefault(agentDO.getKnowledgeBaseId(), null) : null);
         dto.setStatus(agentDO.getStatus().getValue());
         dto.setGmtModified(agentDO.getGmtModified() != null
                 ? agentDO.getGmtModified().toString() : null);

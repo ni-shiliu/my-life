@@ -37,7 +37,7 @@ CREATE TABLE IF NOT EXISTS `ml_agent` (
     `icon_index` INT DEFAULT 0,
     `color` VARCHAR(32) DEFAULT '#6366f1',
     `system_prompt` TEXT DEFAULT NULL,
-    `knowledge_base_id` BIGINT DEFAULT NULL,
+    `knowledge_base_id` BIGINT DEFAULT NULL COMMENT '关联知识库表ID',
     `status` VARCHAR(16) NOT NULL DEFAULT 'DRAFT',
     `is_deleted` CHAR(1) NOT NULL DEFAULT 'N',
     `gmt_created` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -85,3 +85,21 @@ CREATE TABLE IF NOT EXISTS `ml_context_memory` (
     PRIMARY KEY (`id`),
     INDEX `idx_user_agent` (`user_id`, `agent_uuid`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='上下文记忆表';
+
+-- 知识库表
+CREATE TABLE IF NOT EXISTS `ml_knowledge_base` (
+    `id`            BIGINT       NOT NULL AUTO_INCREMENT,
+    `uuid`          VARCHAR(36)  NOT NULL COMMENT '对外唯一标识',
+    `user_id`       BIGINT       NOT NULL COMMENT '用户ID',
+    `name`          VARCHAR(64)  NOT NULL COMMENT '知识库名称',
+    `source`        VARCHAR(16)  NOT NULL DEFAULT 'BAILIAN' COMMENT '来源：BAILIAN-阿里百炼',
+    `external_id`   VARCHAR(64)  NOT NULL COMMENT '外部知识库ID（如百炼知识库ID）',
+    `is_deleted`    CHAR(1)      NOT NULL DEFAULT 'N' COMMENT '是否删除：Y-是，N-否',
+    `gmt_created`   DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `creator`       VARCHAR(64)  NOT NULL DEFAULT 'system' COMMENT '创建人',
+    `gmt_modified`  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    `modifier`      VARCHAR(64)  NOT NULL DEFAULT 'system' COMMENT '更新人',
+    PRIMARY KEY (`id`),
+    UNIQUE INDEX `uniq_uuid` (`uuid`),
+    INDEX `idx_user_id` (`user_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='知识库表';

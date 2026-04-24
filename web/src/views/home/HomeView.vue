@@ -31,7 +31,7 @@
           :class="['tab-btn', { active: activeTab === tab.key }]"
           role="tab"
           :aria-selected="activeTab === tab.key"
-          @click="activeTab = tab.key"
+          @click="switchTab(tab.key)"
         >
           <component :is="renderTabIcon(tab.iconKey)" class="tab-icon" />
           <span>{{ tab.label }}</span>
@@ -40,6 +40,54 @@
 
       <!-- Tab Panels -->
       <div class="tab-panels">
+        <!-- Agent Square Tab -->
+        <section v-if="activeTab === 'square'" class="panel" role="tabpanel">
+          <div class="panel-top">
+            <h2 class="panel-heading">智能体广场</h2>
+            <div class="search-field">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="search-icon">
+                <circle cx="11" cy="11" r="8"/>
+                <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+              </svg>
+              <input type="text" placeholder="搜索智能体..." v-model="searchQuery" />
+            </div>
+          </div>
+          <div v-if="loadingPublished" class="empty">
+            <p class="empty-desc">加载中...</p>
+          </div>
+          <div v-else-if="filteredPublished.length === 0" class="empty">
+            <div class="empty-visual">
+              <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1">
+                <rect x="3" y="3" width="7" height="7" rx="1"/>
+                <rect x="14" y="3" width="7" height="7" rx="1"/>
+                <rect x="14" y="14" width="7" height="7" rx="1"/>
+                <rect x="3" y="14" width="7" height="7" rx="1"/>
+              </svg>
+            </div>
+            <p class="empty-title">暂无公开智能体</p>
+            <p class="empty-desc">还没有已发布的智能体</p>
+          </div>
+          <div v-else class="agent-grid">
+            <div v-for="agent in filteredPublished" :key="agent.uuid" class="agent-card" @click="startChat(agent)">
+              <div class="card-icon" :style="{ background: agent.color || '#6366f1' }">
+                <component :is="renderIcon(agent.iconIndex ?? 0)" />
+              </div>
+              <div class="card-body">
+                <h3 class="card-title">{{ agent.name }}</h3>
+                <p class="card-desc">{{ agent.description }}</p>
+              </div>
+              <div class="card-actions" @click.stop>
+                <button class="btn-ghost btn-sm" @click="startChat(agent)">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                  </svg>
+                  对话
+                </button>
+              </div>
+            </div>
+          </div>
+        </section>
+
         <!-- Agents Tab -->
         <section v-if="activeTab === 'agents'" class="panel" role="tabpanel">
           <div class="panel-top">
@@ -114,49 +162,51 @@
         <section v-if="activeTab === 'knowledge'" class="panel" role="tabpanel">
           <div class="panel-top">
             <h2 class="panel-heading">知识库</h2>
-            <button class="btn-primary">
+            <button class="btn-primary" @click="openAddKbDialog">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <line x1="12" y1="5" x2="12" y2="19"/>
                 <line x1="5" y1="12" x2="19" y2="12"/>
               </svg>
-              上传文档
+              添加知识库
             </button>
           </div>
-          <div class="empty">
+          <div v-if="knowledgeBases.length === 0" class="empty">
             <div class="empty-visual">
               <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1">
                 <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
                 <polyline points="14 2 14 8 20 8"/>
               </svg>
             </div>
-            <p class="empty-title">暂无文档</p>
-            <p class="empty-desc">上传 PDF 或 Word 文档，让智能体学习你的知识</p>
+            <p class="empty-title">暂无知识库</p>
+            <p class="empty-desc">添加阿里百炼知识库，让智能体检索你的知识</p>
           </div>
-        </section>
-
-        <!-- Agent Square Tab -->
-        <section v-if="activeTab === 'square'" class="panel" role="tabpanel">
-          <div class="panel-top">
-            <h2 class="panel-heading">智能体广场</h2>
-            <div class="search-field">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="search-icon">
-                <circle cx="11" cy="11" r="8"/>
-                <line x1="21" y1="21" x2="16.65" y2="16.65"/>
-              </svg>
-              <input type="text" placeholder="搜索智能体..." v-model="searchQuery" />
+          <div v-else class="kb-grid">
+            <div v-for="kb in knowledgeBases" :key="kb.id" class="kb-card">
+              <div class="kb-card-icon">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                  <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
+                  <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+                </svg>
+              </div>
+              <div class="kb-card-body">
+                <h3 class="kb-card-name">{{ kb.name }}</h3>
+                <p class="kb-card-id">百炼ID: {{ kb.externalId }}</p>
+              </div>
+              <div class="card-actions" @click.stop>
+                <button class="btn-ghost btn-sm" @click="openEditKbDialog(kb)" aria-label="编辑">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                  </svg>
+                </button>
+                <button class="btn-ghost btn-sm btn-delete" @click="removeKnowledgeBase(kb.uuid)" aria-label="删除">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="18" y1="6" x2="6" y2="18"/>
+                    <line x1="6" y1="6" x2="18" y2="18"/>
+                  </svg>
+                </button>
+              </div>
             </div>
-          </div>
-          <div class="empty">
-            <div class="empty-visual">
-              <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1">
-                <rect x="3" y="3" width="7" height="7" rx="1"/>
-                <rect x="14" y="3" width="7" height="7" rx="1"/>
-                <rect x="14" y="14" width="7" height="7" rx="1"/>
-                <rect x="3" y="14" width="7" height="7" rx="1"/>
-              </svg>
-            </div>
-            <p class="empty-title">即将上线</p>
-            <p class="empty-desc">智能体广场功能开发中，敬请期待</p>
           </div>
         </section>
       </div>
@@ -315,16 +365,62 @@
         </div>
       </Transition>
     </Teleport>
+
+    <!-- Knowledge Base Dialog -->
+    <Teleport to="body">
+      <Transition name="overlay">
+        <div v-if="showKbDialog" class="overlay" @click="showKbDialog = false">
+          <Transition name="dialog">
+            <div v-if="showKbDialog" class="dialog" @click.stop>
+              <div class="dialog-head">
+                <h3 class="dialog-title">{{ editKbForm.uuid ? '编辑知识库' : '添加知识库' }}</h3>
+                <button class="btn-icon" @click="showKbDialog = false" aria-label="Close">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="18" y1="6" x2="6" y2="18"/>
+                    <line x1="6" y1="6" x2="18" y2="18"/>
+                  </svg>
+                </button>
+              </div>
+              <div class="dialog-body">
+                <div class="field">
+                  <label class="field-label">知识库名称</label>
+                  <input type="text" class="field-input" v-model="editKbForm.name" placeholder="例如：数学教材" />
+                </div>
+                <div class="field">
+                  <label class="field-label">来源</label>
+                  <div class="kb-source-inline">
+                    <span class="kb-source-tag">阿里百炼</span>
+                  </div>
+                </div>
+                <div class="field">
+                  <label class="field-label">百炼知识库 ID</label>
+                  <input type="text" class="field-input" v-model="editKbForm.externalId" placeholder="例如：kb_abc123def" />
+                </div>
+              </div>
+              <div class="dialog-foot">
+                <button class="btn-ghost" @click="showKbDialog = false">取消</button>
+                <button class="btn-primary" @click="saveKnowledgeBase" :disabled="!editKbForm.name.trim() || !editKbForm.externalId.trim()">
+                  {{ editKbForm.uuid ? '保存' : '添加' }}
+                </button>
+              </div>
+            </div>
+          </Transition>
+        </div>
+      </Transition>
+    </Teleport>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, computed, onMounted, watch } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
 import { useUserStore } from '@/stores/user'
 import { useAuth } from '@/composables/useAuth'
 import { useAgentStore } from '@/stores/agent'
+import { listKnowledgeBaseApi, saveKnowledgeBaseApi, deleteKnowledgeBaseApi } from '@/api/knowledgeBase'
+import { listPublishedAgentApi } from '@/api/agent'
 import type { AgentDTO } from '@/types/agent'
+import type { KnowledgeBaseDTO } from '@/types/knowledgeBase'
 
 import { h } from 'vue'
 
@@ -403,24 +499,29 @@ const renderTabIcon = (key: string) => {
 
 // State
 const router = useRouter()
+const route = useRoute()
 const userStore = useUserStore()
 const { logout } = useAuth()
 const agentStore = useAgentStore()
 
-const activeTab = ref('agents')
+const validTabs = ['square', 'agents', 'knowledge']
+const activeTab = ref(validTabs.includes(route.query.tab as string) ? route.query.tab as string : 'square')
 const showCreateDialog = ref(false)
 const showDeleteDialog = ref(false)
 const showEditDialog = ref(false)
+const showKbDialog = ref(false)
 const searchQuery = ref('')
 const creating = ref(false)
 const deleting = ref(false)
 const savingEdit = ref(false)
 const deleteTarget = ref<AgentDTO | null>(null)
+const publishedAgents = ref<AgentDTO[]>([])
+const loadingPublished = ref(false)
 
 const tabs = [
+  { key: 'square', label: '广场', iconKey: 'grid' },
   { key: 'agents', label: '我的智能体', iconKey: 'robot' },
-  { key: 'knowledge', label: '知识库', iconKey: 'book' },
-  { key: 'square', label: '广场', iconKey: 'grid' }
+  { key: 'knowledge', label: '知识库', iconKey: 'book' }
 ]
 
 const newAgent = ref({
@@ -438,6 +539,9 @@ const editForm = ref({
   color: '#6366f1'
 })
 
+const editKbForm = ref({ uuid: '', name: '', externalId: '' })
+const knowledgeBases = ref<KnowledgeBaseDTO[]>([])
+
 const colors = ['#6366f1', '#059669', '#d946ef', '#2563eb', '#0891b2', '#dc2626', '#ca8a04', '#7c3aed']
 
 // Computed
@@ -446,13 +550,41 @@ const userAvatar = computed(() => {
   return name.charAt(0).toUpperCase()
 })
 
+const filteredPublished = computed(() => {
+  if (!searchQuery.value.trim()) return publishedAgents.value
+  const q = searchQuery.value.toLowerCase()
+  return publishedAgents.value.filter(a =>
+    a.name.toLowerCase().includes(q) || (a.description ?? '').toLowerCase().includes(q)
+  )
+})
+
 // Lifecycle
 onMounted(() => {
   userStore.fetchUserInfo()
   agentStore.loadAgents()
+  loadKnowledgeBases()
 })
 
 // Methods
+const switchTab = (key: string) => {
+  activeTab.value = key
+  router.replace({ query: { ...route.query, tab: key } })
+}
+
+const loadPublished = async () => {
+  loadingPublished.value = true
+  try {
+    const { data } = await listPublishedAgentApi()
+    publishedAgents.value = data?.data ?? []
+  } finally {
+    loadingPublished.value = false
+  }
+}
+
+watch(activeTab, (tab) => {
+  if (tab === 'square') loadPublished()
+}, { immediate: true })
+
 const handleLogout = async () => {
   await logout()
   router.push('/login')
@@ -509,6 +641,39 @@ const saveEditAgent = async () => {
   } finally {
     savingEdit.value = false
   }
+}
+
+const loadKnowledgeBases = async () => {
+  const { data } = await listKnowledgeBaseApi()
+  if (data?.data) {
+    knowledgeBases.value = data.data
+  }
+}
+
+const openAddKbDialog = () => {
+  editKbForm.value = { uuid: '', name: '', externalId: '' }
+  showKbDialog.value = true
+}
+
+const openEditKbDialog = (kb: KnowledgeBaseDTO) => {
+  editKbForm.value = { uuid: kb.uuid, name: kb.name, externalId: kb.externalId }
+  showKbDialog.value = true
+}
+
+const saveKnowledgeBase = async () => {
+  if (!editKbForm.value.name.trim() || !editKbForm.value.externalId.trim()) return
+  await saveKnowledgeBaseApi({
+    uuid: editKbForm.value.uuid || undefined,
+    name: editKbForm.value.name,
+    externalId: editKbForm.value.externalId
+  })
+  showKbDialog.value = false
+  await loadKnowledgeBases()
+}
+
+const removeKnowledgeBase = async (uuid: string) => {
+  await deleteKnowledgeBaseApi(uuid)
+  await loadKnowledgeBases()
 }
 
 const confirmDelete = (agent: AgentDTO) => {
@@ -1133,6 +1298,73 @@ $transition: 150ms cubic-bezier(0.4, 0, 0.2, 1);
     border-color: $text-1;
     transform: scale(1.1);
   }
+}
+
+// ── Knowledge Base ──
+.kb-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 16px;
+}
+
+.kb-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 16px 20px;
+  border: 1px solid $border;
+  border-radius: $radius-md;
+  background: $surface;
+  transition: border-color $transition, box-shadow $transition;
+
+  &:hover {
+    border-color: $border-hover;
+    box-shadow: $shadow-md;
+  }
+}
+
+.kb-card-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: $radius-sm;
+  background: rgba(255, 120, 0, 0.08);
+  color: #ff7800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.kb-card-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.kb-card-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: $text-1;
+  margin-bottom: 2px;
+}
+
+.kb-card-id {
+  font-size: 12px;
+  color: $text-3;
+  font-family: monospace;
+}
+
+.kb-source-inline {
+  display: flex;
+  align-items: center;
+}
+
+.kb-source-tag {
+  padding: 6px 12px;
+  border-radius: $radius-sm;
+  background: rgba(255, 120, 0, 0.08);
+  color: #ff7800;
+  font-size: 13px;
+  font-weight: 500;
 }
 
 // ── Dialog Transitions ──

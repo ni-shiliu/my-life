@@ -39,6 +39,11 @@ public class AgentController {
         return BaseResult.success(agentService.list(SecurityUtils.getUserId()));
     }
 
+    @GetMapping("/published")
+    public BaseResult<List<AgentDTO>> listPublished() {
+        return BaseResult.success(agentService.listPublished());
+    }
+
     @PostMapping("/publish")
     public BaseResult<Void> publish(@RequestParam String uuid) {
         agentService.publish(SecurityUtils.getUserId(), uuid);

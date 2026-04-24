@@ -19,7 +19,7 @@
 <script setup lang="ts">
 import type { ChatMessage } from '@/types/chat'
 
-const props = defineProps<{
+defineProps<{
   msg: ChatMessage
   agentColor?: string
 }>()

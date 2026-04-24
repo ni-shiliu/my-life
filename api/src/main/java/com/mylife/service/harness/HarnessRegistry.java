@@ -4,12 +4,14 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.mylife.common.BizException;
 import com.mylife.common.ErrorCode;
 import com.mylife.entity.AgentDO;
+import com.mylife.entity.KnowledgeBaseDO;
 import com.mylife.entity.ChatMessageDO;
 import com.mylife.enums.ChatRoleEnum;
 import com.mylife.enums.ChatSceneEnum;
 import com.mylife.mapper.AgentMapper;
 import com.mylife.mapper.ChatMessageMapper;
 import com.mylife.mapper.ContextMemoryMapper;
+import com.mylife.mapper.KnowledgeBaseMapper;
 import io.agentscope.core.ReActAgent;
 import io.agentscope.core.message.Msg;
 import io.agentscope.core.message.MsgRole;
@@ -45,6 +47,7 @@ public class HarnessRegistry {
     private final ChatMessageMapper chatMessageMapper;
     private final AgentMapper agentMapper;
     private final ContextMemoryMapper contextMemoryMapper;
+    private final KnowledgeBaseMapper knowledgeBaseMapper;
 
 //    @Value("${llm.base-url}")
 //    private String baseUrl;
@@ -126,7 +129,8 @@ public class HarnessRegistry {
                 .toolExecutionContext(toolContext);
 
         // 如果 Agent 绑定了知识库，启用 Agentic RAG
-        Knowledge knowledge = buildKnowledge("s8oqccehtq");
+        String externalId = resolveKbExternalId(agent.getKnowledgeBaseId());
+        Knowledge knowledge = buildKnowledge(externalId);
         if (knowledge != null) {
             agentBuilder.knowledge(knowledge)
                     .ragMode(RAGMode.AGENTIC);
@@ -139,6 +143,17 @@ public class HarnessRegistry {
         return new TeacherHarness(
                 key, userId, agentUuid, scene, reactAgent, memory,
                 chatMessageMapper, sseHook, compressionHook);
+    }
+
+    /**
+     * 根据 ml_knowledge_base.id 查询百炼外部知识库ID。
+     */
+    private String resolveKbExternalId(Long knowledgeBaseId) {
+        if (knowledgeBaseId == null) {
+            return null;
+        }
+        KnowledgeBaseDO kbDO = knowledgeBaseMapper.selectById(knowledgeBaseId);
+        return kbDO != null ? kbDO.getExternalId() : null;
     }
 
     /**

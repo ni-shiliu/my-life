@@ -62,13 +62,17 @@
 
           <div class="field">
             <label class="field-label">知识库</label>
-            <div class="select-wrap">
-              <select class="field-select" v-model="form.knowledgeBaseId">
-                <option :value="null">暂无知识库</option>
-              </select>
-              <svg class="select-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <polyline points="6 9 12 15 18 9"/>
-              </svg>
+            <div class="kb-source">
+              <span class="kb-source-tag">阿里百炼</span>
+              <div class="select-wrap">
+                <select class="field-select" v-model="form.knowledgeBaseId">
+                  <option :value="null">暂无知识库</option>
+                  <option v-for="kb in kbOptions" :key="kb.id" :value="kb.id">{{ kb.name }}</option>
+                </select>
+                <svg class="select-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <polyline points="6 9 12 15 18 9"/>
+                </svg>
+              </div>
             </div>
             <p class="field-hint">关联知识库后，智能体可检索相关文档回答问题</p>
           </div>
@@ -137,8 +141,10 @@ import { useUserStore } from '@/stores/user'
 import { useAuth } from '@/composables/useAuth'
 import { useAgentStore } from '@/stores/agent'
 import { getAgentApi } from '@/api/agent'
+import { listKnowledgeBaseApi } from '@/api/knowledgeBase'
 import { showToast } from '@/components/auth/toast-state'
 import type { AgentDTO } from '@/types/agent'
+import type { KnowledgeBaseDTO } from '@/types/knowledgeBase'
 import ChatPanel from '@/components/chat/ChatPanel.vue'
 
 // SVG Icon render helpers
@@ -220,7 +226,13 @@ const form = ref({
   knowledgeBaseId: null as number | null
 })
 
+const kbOptions = ref<KnowledgeBaseDTO[]>([])
+
 onMounted(async () => {
+  listKnowledgeBaseApi().then(({ data }) => {
+    if (data?.data) kbOptions.value = data.data
+  })
+
   const uuid = route.params.id as string
   try {
     const { data } = await getAgentApi(uuid)
@@ -730,6 +742,27 @@ $transition: 150ms cubic-bezier(0.4, 0, 0.2, 1);
   margin-top: 4px;
   font-size: 12px;
   color: $text-3;
+}
+
+.kb-source {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+
+  .select-wrap {
+    flex: 1;
+  }
+}
+
+.kb-source-tag {
+  flex-shrink: 0;
+  padding: 6px 10px;
+  border-radius: $radius-sm;
+  background: rgba(255, 120, 0, 0.08);
+  color: #ff7800;
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
 }
 
 // ── Responsive ──

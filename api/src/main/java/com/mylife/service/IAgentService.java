@@ -15,5 +15,7 @@ public interface IAgentService {
 
     List<AgentDTO> list(Long userId);
 
+    List<AgentDTO> listPublished();
+
     void publish(Long userId, String uuid);
 }
