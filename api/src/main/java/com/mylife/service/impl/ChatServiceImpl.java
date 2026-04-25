@@ -5,9 +5,11 @@ import com.mylife.common.BizException;
 import com.mylife.common.ErrorCode;
 import com.mylife.dto.ChatMessageDTO;
 import com.mylife.entity.ChatMessageDO;
+import com.mylife.entity.ChatRoomDO;
 import com.mylife.enums.ChatRoleEnum;
 import com.mylife.enums.ChatSceneEnum;
 import com.mylife.mapper.ChatMessageMapper;
+import com.mylife.service.IChatRoomService;
 import com.mylife.service.IChatService;
 import com.mylife.service.harness.HarnessRegistry;
 import com.mylife.service.harness.SseEventHelper;
@@ -36,6 +38,7 @@ public class ChatServiceImpl implements IChatService {
 
     private final HarnessRegistry harnessRegistry;
     private final ChatMessageMapper chatMessageMapper;
+    private final IChatRoomService chatRoomService;
     private final ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor();
 
     @Override
@@ -80,11 +83,17 @@ public class ChatServiceImpl implements IChatService {
     }
 
     @Override
-    public List<ChatMessageDTO> getHistory(Long userId, String agentUuid, ChatSceneEnum scene) {
+    public String ensureRoom(Long userId, String agentUuid, ChatSceneEnum scene) {
+        ChatSceneEnum effectiveScene = scene != null ? scene : ChatSceneEnum.PUBLISHED;
+        ChatRoomDO room = chatRoomService.getOrCreate(userId, agentUuid, effectiveScene);
+        return room.getRoomId();
+    }
+
+    @Override
+    public List<ChatMessageDTO> getHistory(Long userId, String roomId) {
+        ChatRoomDO room = chatRoomService.getAndCheckOwnerByRoomId(userId, roomId);
         LambdaQueryWrapper<ChatMessageDO> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(ChatMessageDO::getUserId, userId)
-               .eq(ChatMessageDO::getAgentUuid, agentUuid)
-               .eq(scene != null, ChatMessageDO::getScene, scene)
+        wrapper.eq(ChatMessageDO::getRoomId, room.getId())
                .orderByDesc(ChatMessageDO::getGmtCreated)
                .last("LIMIT " + MAX_HISTORY);
         List<ChatMessageDO> list = chatMessageMapper.selectList(wrapper);
@@ -93,22 +102,26 @@ public class ChatServiceImpl implements IChatService {
     }
 
     @Override
-    public void clearHistory(Long userId, String agentUuid, ChatSceneEnum scene) {
-        ChatSceneEnum effectiveScene = scene != null ? scene : ChatSceneEnum.PUBLISHED;
+    public void clearHistory(Long userId, String roomId) {
+        ChatRoomDO room = chatRoomService.getAndCheckOwnerByRoomId(userId, roomId);
+        chatRoomService.clearByRoomId(room.getId());
+        harnessRegistry.remove(userId, room.getAgentUuid(), room.getScene());
+        log.info("清空聊天记录：userId={}, roomId={}", userId, roomId);
+    }
 
-        LambdaQueryWrapper<ChatMessageDO> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(ChatMessageDO::getUserId, userId)
-               .eq(ChatMessageDO::getAgentUuid, agentUuid)
-               .eq(ChatMessageDO::getScene, effectiveScene);
-        chatMessageMapper.delete(wrapper);
-
-        harnessRegistry.remove(userId, agentUuid, effectiveScene);
-        log.info("清空聊天记录：userId={}, agentUuid={}, scene={}", userId, agentUuid, effectiveScene);
+    @Override
+    public void clearMemory(Long userId, String roomId) {
+        ChatRoomDO room = chatRoomService.getAndCheckOwnerByRoomId(userId, roomId);
+        chatRoomService.clearMemoryByRoomId(room.getId());
+        harnessRegistry.removeWithoutPersist(userId, room.getAgentUuid(), room.getScene());
+        log.info("清空上下文记忆：userId={}, roomId={}", userId, roomId);
     }
 
     private ChatMessageDTO convertToDTO(ChatMessageDO entity) {
         ChatMessageDTO dto = new ChatMessageDTO();
         dto.setId(entity.getId());
+        dto.setMessageId(entity.getMessageId());
+        dto.setRoomId(entity.getRoomId());
         dto.setRole(entity.getRole());
         dto.setContent(entity.getContent());
         dto.setToolName(entity.getToolName());

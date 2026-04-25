@@ -10,6 +10,10 @@ public class ChatMessageDTO {
 
     private Long id;
 
+    private String messageId;
+
+    private Long roomId;
+
     private ChatRoleEnum role;
 
     private String content;

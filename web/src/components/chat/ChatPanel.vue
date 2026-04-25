@@ -33,6 +33,13 @@
             </svg>
             清空聊天记录
           </button>
+          <button class="action-item" @click="handleClearMemory">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M12 2a10 10 0 1 0 10 10"/>
+              <path d="M12 2v10l6.93 4"/>
+            </svg>
+            清空记忆
+          </button>
         </div>
       </div>
     </div>
@@ -71,12 +78,32 @@
       :placeholder="streaming ? 'AI正在回复...' : '发送消息...'"
       @send="sendMessage"
     />
+
+    <Teleport to="body">
+      <Transition name="overlay">
+        <div v-if="showClearMemoryDialog" class="overlay" @click="showClearMemoryDialog = false">
+          <div class="dialog" @click.stop>
+            <div class="dialog-head">
+              <h3 class="dialog-title">清空记忆</h3>
+            </div>
+            <div class="dialog-body">
+              <p class="dialog-msg">确定清空AI的记忆吗？清空后AI将不再记住之前的对话内容，但聊天记录仍会保留。</p>
+            </div>
+            <div class="dialog-foot">
+              <button class="btn-ghost" @click="showClearMemoryDialog = false">取消</button>
+              <button class="btn-danger" @click="doClearMemory">清空</button>
+            </div>
+          </div>
+        </div>
+      </Transition>
+    </Teleport>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, watch, nextTick, onMounted, toRef } from 'vue'
 import { useChat } from '@/composables/useChat'
+import { showToast } from '@/components/auth/toast-state'
 import ChatMessage from './ChatMessage.vue'
 import ChatInput from './ChatInput.vue'
 
@@ -97,10 +124,12 @@ const {
   sendMessage: chatSend,
   loadHistory,
   clearHistory,
+  clearMemory,
 } = useChat(toRef(props, 'agentUuid'), sceneRef)
 
 const messagesRef = ref<HTMLElement | null>(null)
 const menuOpen = ref(false)
+const showClearMemoryDialog = ref(false)
 
 function scrollToBottom() {
   nextTick(() => {
@@ -134,6 +163,17 @@ function sendMessage(text: string) {
 async function handleClear() {
   menuOpen.value = false
   await clearHistory()
+}
+
+function handleClearMemory() {
+  menuOpen.value = false
+  showClearMemoryDialog.value = true
+}
+
+async function doClearMemory() {
+  showClearMemoryDialog.value = false
+  await clearMemory()
+  showToast('记忆已清空', 'success')
 }
 </script>
 
@@ -307,4 +347,92 @@ $radius-md: 12px;
   font-size: 18px;
   padding: 0 4px;
 }
+
+// ── Dialog ──
+$danger: #ef4444;
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  background: rgba(0, 0, 0, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.dialog {
+  background: $surface;
+  border-radius: $radius-md;
+  width: 100%;
+  max-width: 360px;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
+}
+
+.dialog-head {
+  padding: 20px 24px 0;
+}
+
+.dialog-title {
+  font-size: 17px;
+  font-weight: 600;
+  color: $text-1;
+}
+
+.dialog-body {
+  padding: 20px 24px;
+}
+
+.dialog-msg {
+  font-size: 14px;
+  color: $text-2;
+  line-height: 1.6;
+}
+
+.dialog-foot {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 0 24px 20px;
+}
+
+.btn-ghost {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 16px;
+  border: 1px solid $border;
+  border-radius: $radius-sm;
+  background: $surface;
+  color: $text-2;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: border-color 150ms, color 150ms;
+
+  &:hover { border-color: $text-3; color: $text-1; }
+}
+
+.btn-danger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 16px;
+  border: none;
+  border-radius: $radius-sm;
+  background: $danger;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: opacity 150ms;
+
+  &:hover { opacity: 0.9; }
+}
+
+.overlay-enter-active,
+.overlay-leave-active { transition: opacity 200ms ease; }
+.overlay-enter-from,
+.overlay-leave-to { opacity: 0; }
 </style>

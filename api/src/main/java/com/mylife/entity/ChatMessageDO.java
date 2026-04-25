@@ -15,6 +15,10 @@ public class ChatMessageDO {
     @TableId(type = IdType.AUTO)
     private Long id;
 
+    private String messageId;
+
+    private Long roomId;
+
     private Long userId;
 
     private String agentUuid;

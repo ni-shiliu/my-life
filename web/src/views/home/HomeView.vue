@@ -41,7 +41,7 @@
       <!-- Tab Panels -->
       <div class="tab-panels">
         <!-- Agent Square Tab -->
-        <section v-if="activeTab === 'square'" class="panel" role="tabpanel">
+        <section v-if="activeTab === 'square'" class="panel panel-square" role="tabpanel">
           <div class="panel-top">
             <h2 class="panel-heading">智能体广场</h2>
             <div class="search-field">
@@ -64,32 +64,71 @@
                 <rect x="3" y="14" width="7" height="7" rx="1"/>
               </svg>
             </div>
-            <p class="empty-title">暂无公开智能体</p>
-            <p class="empty-desc">还没有已发布的智能体</p>
+            <p class="empty-title">{{ searchQuery.trim() ? '未找到匹配的智能体' : '暂无公开智能体' }}</p>
+            <p class="empty-desc">{{ searchQuery.trim() ? '换个关键词试试' : '还没有已发布的智能体' }}</p>
           </div>
-          <div v-else class="agent-grid">
-            <div v-for="agent in filteredPublished" :key="agent.uuid" class="agent-card" @click="startChat(agent)">
-              <div class="card-icon" :style="{ background: agent.color || '#6366f1' }">
-                <component :is="renderIcon(agent.iconIndex ?? 0)" />
-              </div>
-              <div class="card-body">
-                <h3 class="card-title">{{ agent.name }}</h3>
-                <p class="card-desc">{{ agent.description }}</p>
-              </div>
-              <div class="card-actions" @click.stop>
-                <button class="btn-ghost btn-sm" @click="startChat(agent)">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
-                  </svg>
-                  对话
-                </button>
+          <template v-else>
+            <div class="agent-grid agent-grid-square">
+              <div v-for="agent in filteredPublished" :key="agent.uuid" class="agent-card" @click="startChat(agent)">
+                <div class="card-icon" :style="{ background: agent.color || '#6366f1' }">
+                  <component :is="renderIcon(agent.iconIndex ?? 0)" />
+                </div>
+                <div class="card-body">
+                  <h3 class="card-title">
+                    {{ agent.name }}
+                    <span v-if="agent.owned" class="badge badge-owned">我的</span>
+                    <span v-else-if="agent.added" class="badge badge-added">已添加</span>
+                  </h3>
+                  <p class="card-desc">{{ agent.description }}</p>
+                </div>
+                <div class="card-actions" @click.stop>
+                  <button class="btn-ghost btn-sm" @click="startChat(agent)">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                    </svg>
+                    对话
+                  </button>
+                  <button v-if="!agent.owned && !agent.added" class="btn-ghost btn-sm" @click="addAgent(agent)">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <line x1="12" y1="5" x2="12" y2="19"/>
+                      <line x1="5" y1="12" x2="19" y2="12"/>
+                    </svg>
+                    添加
+                  </button>
+                  <button v-if="agent.added" class="btn-ghost btn-sm btn-delete" @click="removeAgent(agent)">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <line x1="18" y1="6" x2="6" y2="18"/>
+                      <line x1="6" y1="6" x2="18" y2="18"/>
+                    </svg>
+                    移除
+                  </button>
+                </div>
               </div>
             </div>
-          </div>
+            <div v-if="squareTotalPages > 0" class="pagination">
+              <button class="page-btn" :disabled="squarePage === 0" @click="goToPage(squarePage - 1)">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <polyline points="15 18 9 12 15 6"/>
+                </svg>
+              </button>
+              <template v-for="p in squareTotalPages" :key="p">
+                <button v-if="p - 1 === 0 || p - 1 === squareTotalPages - 1 || Math.abs((p - 1) - squarePage) <= 1"
+                  :class="['page-btn', { active: p - 1 === squarePage }]"
+                  @click="goToPage(p - 1)"
+                >{{ p }}</button>
+                <span v-else-if="Math.abs((p - 1) - squarePage) === 2" class="page-ellipsis">...</span>
+              </template>
+              <button class="page-btn" :disabled="squarePage >= squareTotalPages - 1" @click="goToPage(squarePage + 1)">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <polyline points="9 18 15 12 9 6"/>
+                </svg>
+              </button>
+            </div>
+          </template>
         </section>
 
         <!-- Agents Tab -->
-        <section v-if="activeTab === 'agents'" class="panel" role="tabpanel">
+        <section v-if="activeTab === 'agents'" class="panel panel-square" role="tabpanel">
           <div class="panel-top">
             <h2 class="panel-heading">我的智能体</h2>
             <button class="btn-primary" @click="showCreateDialog = true">
@@ -118,48 +157,69 @@
             <p class="empty-desc">创建你的第一个智能体开始使用</p>
           </div>
 
-          <div v-else class="agent-grid">
-            <div v-for="agent in agentStore.agents" :key="agent.uuid" class="agent-card" @click="goToEdit(agent)">
-              <div class="card-icon" :style="{ background: agent.color || '#6366f1' }">
-                <component :is="renderIcon(agent.iconIndex ?? 0)" />
-              </div>
-              <div class="card-body">
-                <h3 class="card-title">
-                  {{ agent.name }}
-                  <span v-if="agent.status === 'PUBLISHED'" class="badge">已发布</span>
-                </h3>
-                <p class="card-desc">{{ agent.description }}</p>
-              </div>
-              <div class="card-actions" @click.stop>
-                <button class="btn-ghost btn-sm" @click="startChat(agent)">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
-                  </svg>
-                  对话
-                </button>
-                <button class="btn-ghost btn-sm" @click="openEditDialog(agent)" aria-label="编辑">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
-                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
-                  </svg>
-                  编辑
-                </button>
-                <button class="btn-ghost btn-sm btn-delete" @click="confirmDelete(agent)" aria-label="删除">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <polyline points="3 6 5 6 21 6"></polyline>
-                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-                    <line x1="10" y1="11" x2="10" y2="17"></line>
-                    <line x1="14" y1="11" x2="14" y2="17"></line>
-                  </svg>
-                  删除
-                </button>
+          <template v-else>
+            <div class="agent-grid agent-grid-square">
+              <div v-for="agent in agentStore.agents" :key="agent.uuid" class="agent-card" @click="goToEdit(agent)">
+                <div class="card-icon" :style="{ background: agent.color || '#6366f1' }">
+                  <component :is="renderIcon(agent.iconIndex ?? 0)" />
+                </div>
+                <div class="card-body">
+                  <h3 class="card-title">
+                    {{ agent.name }}
+                    <span v-if="agent.status === 'PUBLISHED'" class="badge">已发布</span>
+                  </h3>
+                  <p class="card-desc">{{ agent.description }}</p>
+                </div>
+                <div class="card-actions" @click.stop>
+                  <button v-if="agent.status === 'PUBLISHED'" class="btn-ghost btn-sm" @click="startChat(agent)">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                    </svg>
+                    对话
+                  </button>
+                  <button class="btn-ghost btn-sm" @click="openEditDialog(agent)" aria-label="编辑">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                      <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                    </svg>
+                    编辑
+                  </button>
+                  <button class="btn-ghost btn-sm btn-delete" @click="confirmDelete(agent)" aria-label="删除">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <polyline points="3 6 5 6 21 6"></polyline>
+                      <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                      <line x1="10" y1="11" x2="10" y2="17"></line>
+                      <line x1="14" y1="11" x2="14" y2="17"></line>
+                    </svg>
+                    删除
+                  </button>
+                </div>
               </div>
             </div>
-          </div>
+            <div v-if="agentStore.totalPages > 0" class="pagination">
+              <button class="page-btn" :disabled="agentStore.currentPage === 0" @click="agentStore.loadAgentsPage(agentStore.currentPage - 1)">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <polyline points="15 18 9 12 15 6"/>
+                </svg>
+              </button>
+              <template v-for="p in agentStore.totalPages" :key="p">
+                <button v-if="p - 1 === 0 || p - 1 === agentStore.totalPages - 1 || Math.abs((p - 1) - agentStore.currentPage) <= 1"
+                  :class="['page-btn', { active: p - 1 === agentStore.currentPage }]"
+                  @click="agentStore.loadAgentsPage(p - 1)"
+                >{{ p }}</button>
+                <span v-else-if="Math.abs((p - 1) - agentStore.currentPage) === 2" class="page-ellipsis">...</span>
+              </template>
+              <button class="page-btn" :disabled="agentStore.currentPage >= agentStore.totalPages - 1" @click="agentStore.loadAgentsPage(agentStore.currentPage + 1)">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <polyline points="9 18 15 12 9 6"/>
+                </svg>
+              </button>
+            </div>
+          </template>
         </section>
 
         <!-- Knowledge Base Tab -->
-        <section v-if="activeTab === 'knowledge'" class="panel" role="tabpanel">
+        <section v-if="activeTab === 'knowledge'" class="panel panel-square" role="tabpanel">
           <div class="panel-top">
             <h2 class="panel-heading">知识库</h2>
             <button class="btn-primary" @click="openAddKbDialog">
@@ -170,7 +230,10 @@
               添加知识库
             </button>
           </div>
-          <div v-if="knowledgeBases.length === 0" class="empty">
+          <div v-if="loadingKb" class="loading">
+            <div class="spinner"></div>
+          </div>
+          <div v-else-if="knowledgeBases.length === 0" class="empty">
             <div class="empty-visual">
               <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1">
                 <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
@@ -180,34 +243,55 @@
             <p class="empty-title">暂无知识库</p>
             <p class="empty-desc">添加阿里百炼知识库，让智能体检索你的知识</p>
           </div>
-          <div v-else class="kb-grid">
-            <div v-for="kb in knowledgeBases" :key="kb.id" class="kb-card">
-              <div class="kb-card-icon">
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                  <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
-                  <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
-                </svg>
-              </div>
-              <div class="kb-card-body">
-                <h3 class="kb-card-name">{{ kb.name }}</h3>
-                <p class="kb-card-id">百炼ID: {{ kb.externalId }}</p>
-              </div>
-              <div class="card-actions" @click.stop>
-                <button class="btn-ghost btn-sm" @click="openEditKbDialog(kb)" aria-label="编辑">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
-                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+          <template v-else>
+            <div class="kb-grid kb-grid-page">
+              <div v-for="kb in knowledgeBases" :key="kb.id" class="kb-card">
+                <div class="kb-card-icon">
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                    <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
+                    <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
                   </svg>
-                </button>
-                <button class="btn-ghost btn-sm btn-delete" @click="removeKnowledgeBase(kb.uuid)" aria-label="删除">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <line x1="18" y1="6" x2="6" y2="18"/>
-                    <line x1="6" y1="6" x2="18" y2="18"/>
-                  </svg>
-                </button>
+                </div>
+                <div class="kb-card-body">
+                  <h3 class="kb-card-name">{{ kb.name }}</h3>
+                  <p class="kb-card-id">百炼ID: {{ kb.externalId }}</p>
+                </div>
+                <div class="card-actions" @click.stop>
+                  <button class="btn-ghost btn-sm" @click="openEditKbDialog(kb)" aria-label="编辑">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                      <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                    </svg>
+                  </button>
+                  <button class="btn-ghost btn-sm btn-delete" @click="removeKnowledgeBase(kb.uuid)" aria-label="删除">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <line x1="18" y1="6" x2="6" y2="18"/>
+                      <line x1="6" y1="6" x2="18" y2="18"/>
+                    </svg>
+                  </button>
+                </div>
               </div>
             </div>
-          </div>
+            <div v-if="kbTotalPages > 0" class="pagination">
+              <button class="page-btn" :disabled="kbCurrentPage === 0" @click="goToKbPage(kbCurrentPage - 1)">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <polyline points="15 18 9 12 15 6"/>
+                </svg>
+              </button>
+              <template v-for="p in kbTotalPages" :key="p">
+                <button v-if="p - 1 === 0 || p - 1 === kbTotalPages - 1 || Math.abs((p - 1) - kbCurrentPage) <= 1"
+                  :class="['page-btn', { active: p - 1 === kbCurrentPage }]"
+                  @click="goToKbPage(p - 1)"
+                >{{ p }}</button>
+                <span v-else-if="Math.abs((p - 1) - kbCurrentPage) === 2" class="page-ellipsis">...</span>
+              </template>
+              <button class="page-btn" :disabled="kbCurrentPage >= kbTotalPages - 1" @click="goToKbPage(kbCurrentPage + 1)">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <polyline points="9 18 15 12 9 6"/>
+                </svg>
+              </button>
+            </div>
+          </template>
         </section>
       </div>
     </main>
@@ -417,8 +501,8 @@ import { useRouter, useRoute } from 'vue-router'
 import { useUserStore } from '@/stores/user'
 import { useAuth } from '@/composables/useAuth'
 import { useAgentStore } from '@/stores/agent'
-import { listKnowledgeBaseApi, saveKnowledgeBaseApi, deleteKnowledgeBaseApi } from '@/api/knowledgeBase'
-import { listPublishedAgentApi } from '@/api/agent'
+import { saveKnowledgeBaseApi, deleteKnowledgeBaseApi, listKnowledgeBasePageApi } from '@/api/knowledgeBase'
+import { queryPublishedAgentApi, addAgentApi, removeAgentApi } from '@/api/agent'
 import type { AgentDTO } from '@/types/agent'
 import type { KnowledgeBaseDTO } from '@/types/knowledgeBase'
 
@@ -517,6 +601,13 @@ const savingEdit = ref(false)
 const deleteTarget = ref<AgentDTO | null>(null)
 const publishedAgents = ref<AgentDTO[]>([])
 const loadingPublished = ref(false)
+const squarePage = ref(0)
+const squareTotalPages = ref(0)
+const pageSize = 6
+
+const kbCurrentPage = ref(0)
+const kbTotalPages = ref(0)
+const loadingKb = ref(false)
 
 const tabs = [
   { key: 'square', label: '广场', iconKey: 'grid' },
@@ -550,19 +641,23 @@ const userAvatar = computed(() => {
   return name.charAt(0).toUpperCase()
 })
 
-const filteredPublished = computed(() => {
-  if (!searchQuery.value.trim()) return publishedAgents.value
-  const q = searchQuery.value.toLowerCase()
-  return publishedAgents.value.filter(a =>
-    a.name.toLowerCase().includes(q) || (a.description ?? '').toLowerCase().includes(q)
-  )
+const filteredPublished = computed(() => publishedAgents.value)
+
+let searchTimer: ReturnType<typeof setTimeout> | null = null
+
+watch(searchQuery, () => {
+  if (searchTimer) clearTimeout(searchTimer)
+  searchTimer = setTimeout(() => {
+    squarePage.value = 0
+    loadPublished()
+  }, 300)
 })
 
 // Lifecycle
 onMounted(() => {
   userStore.fetchUserInfo()
-  agentStore.loadAgents()
-  loadKnowledgeBases()
+  agentStore.loadAgentsPage(0)
+  loadKbPage(0)
 })
 
 // Methods
@@ -574,11 +669,32 @@ const switchTab = (key: string) => {
 const loadPublished = async () => {
   loadingPublished.value = true
   try {
-    const { data } = await listPublishedAgentApi()
-    publishedAgents.value = data?.data ?? []
+    const { data } = await queryPublishedAgentApi({
+      name: searchQuery.value.trim() || undefined,
+      page: squarePage.value,
+      size: pageSize
+    })
+    const page = data?.data
+    publishedAgents.value = page?.records ?? []
+    squareTotalPages.value = page?.pages ?? 0
   } finally {
     loadingPublished.value = false
   }
+}
+
+const goToPage = (page: number) => {
+  squarePage.value = page
+  loadPublished()
+}
+
+const addAgent = async (agent: AgentDTO) => {
+  await addAgentApi(agent.uuid)
+  agent.added = true
+}
+
+const removeAgent = async (agent: AgentDTO) => {
+  await removeAgentApi(agent.uuid)
+  agent.added = false
 }
 
 watch(activeTab, (tab) => {
@@ -607,7 +723,15 @@ const createAgent = async () => {
   }
 }
 
-const startChat = (agent: AgentDTO) => {
+const startChat = async (agent: AgentDTO) => {
+  if (!agent.owned && !agent.added) {
+    try {
+      await addAgentApi(agent.uuid)
+      agent.added = true
+    } catch {
+      // 已添加或自己的，忽略
+    }
+  }
   router.push(`/chat/${agent.uuid}`)
 }
 
@@ -643,11 +767,25 @@ const saveEditAgent = async () => {
   }
 }
 
-const loadKnowledgeBases = async () => {
-  const { data } = await listKnowledgeBaseApi()
-  if (data?.data) {
-    knowledgeBases.value = data.data
+const loadKbPage = async (page?: number) => {
+  loadingKb.value = true
+  try {
+    if (page !== undefined) kbCurrentPage.value = page
+    const { data } = await listKnowledgeBasePageApi({
+      page: kbCurrentPage.value,
+      size: pageSize
+    })
+    const p = data?.data
+    knowledgeBases.value = p?.records ?? []
+    kbTotalPages.value = p?.pages ?? 0
+  } finally {
+    loadingKb.value = false
   }
+}
+
+const goToKbPage = (page: number) => {
+  kbCurrentPage.value = page
+  loadKbPage()
 }
 
 const openAddKbDialog = () => {
@@ -668,12 +806,12 @@ const saveKnowledgeBase = async () => {
     externalId: editKbForm.value.externalId
   })
   showKbDialog.value = false
-  await loadKnowledgeBases()
+  await loadKbPage()
 }
 
 const removeKnowledgeBase = async (uuid: string) => {
   await deleteKnowledgeBaseApi(uuid)
-  await loadKnowledgeBases()
+  await loadKbPage()
 }
 
 const confirmDelete = (agent: AgentDTO) => {
@@ -719,6 +857,8 @@ $transition: 150ms cubic-bezier(0.4, 0, 0.2, 1);
 
 .home-view {
   min-height: 100vh;
+  display: flex;
+  flex-direction: column;
   background: $bg;
   color: $text-1;
   -webkit-font-smoothing: antialiased;
@@ -741,7 +881,7 @@ $transition: 150ms cubic-bezier(0.4, 0, 0.2, 1);
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 24px;
+  padding: 0 32px 0 24px;
 }
 
 .header-left {
@@ -774,7 +914,7 @@ $transition: 150ms cubic-bezier(0.4, 0, 0.2, 1);
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 4px 12px 4px 4px;
+  padding: 6px 16px 6px 6px;
   border-radius: 999px;
   border: 1px solid $border;
   background: $surface;
@@ -813,9 +953,13 @@ $transition: 150ms cubic-bezier(0.4, 0, 0.2, 1);
 
 // ── Main ──
 .home-main {
+  flex: 1;
   max-width: 1200px;
+  width: 100%;
   margin: 0 auto;
   padding: 32px 24px;
+  display: flex;
+  flex-direction: column;
 }
 
 // ── Tab Nav ──
@@ -854,6 +998,12 @@ $transition: 150ms cubic-bezier(0.4, 0, 0.2, 1);
 // ── Panel ──
 .panel {
   animation: panelIn 200ms ease-out;
+
+  &.panel-square {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+  }
 }
 
 @keyframes panelIn {
@@ -1089,6 +1239,11 @@ $transition: 150ms cubic-bezier(0.4, 0, 0.2, 1);
   gap: 16px;
 }
 
+.agent-grid-square {
+  flex: 1;
+  align-content: start;
+}
+
 // ── Agent Card ──
 .agent-card {
   display: flex;
@@ -1139,6 +1294,16 @@ $transition: 150ms cubic-bezier(0.4, 0, 0.2, 1);
   border-radius: 999px;
   background: rgba(5, 150, 105, 0.1);
   color: #059669;
+
+  &.badge-owned {
+    background: rgba(37, 99, 235, 0.1);
+    color: #2563eb;
+  }
+
+  &.badge-added {
+    background: rgba(5, 150, 105, 0.1);
+    color: #059669;
+  }
 }
 
 .card-desc {
@@ -1307,6 +1472,11 @@ $transition: 150ms cubic-bezier(0.4, 0, 0.2, 1);
   gap: 16px;
 }
 
+.kb-grid-page {
+  flex: 1;
+  align-content: start;
+}
+
 .kb-card {
   display: flex;
   align-items: center;
@@ -1377,6 +1547,61 @@ $transition: 150ms cubic-bezier(0.4, 0, 0.2, 1);
 .dialog-leave-active { transition: opacity 150ms ease, transform 150ms ease; }
 .dialog-enter-from { opacity: 0; transform: scale(0.95) translateY(8px); }
 .dialog-leave-to { opacity: 0; transform: scale(0.97); }
+
+// ── Pagination ──
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  margin-top: 32px;
+  padding-top: 16px;
+  border-top: 1px solid $border;
+}
+
+.page-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 36px;
+  height: 36px;
+  padding: 0 8px;
+  border: 1px solid $border;
+  border-radius: $radius-sm;
+  background: $surface;
+  color: $text-2;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: border-color $transition, color $transition, background $transition;
+
+  &:hover:not(:disabled) {
+    border-color: $primary;
+    color: $primary;
+    background: $primary-soft;
+  }
+
+  &.active {
+    border-color: $primary;
+    background: $primary;
+    color: $primary-text;
+  }
+
+  &:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+}
+
+.page-ellipsis {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 36px;
+  height: 36px;
+  color: $text-3;
+  font-size: 14px;
+}
 
 // ── Responsive ──
 @media (max-width: 768px) {

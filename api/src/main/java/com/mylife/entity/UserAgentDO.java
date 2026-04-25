@@ -6,21 +6,15 @@ import lombok.Data;
 import java.time.LocalDateTime;
 
 @Data
-@TableName("ml_context_memory")
-public class ContextMemoryDO {
+@TableName("ml_user_agent")
+public class UserAgentDO {
 
     @TableId(type = IdType.AUTO)
     private Long id;
 
-    private Long roomId;
-
     private Long userId;
 
-    private String agentId;
-
-    private String content;
-
-    private Integer messageCount;
+    private String agentUuid;
 
     @TableLogic
     private String isDeleted;

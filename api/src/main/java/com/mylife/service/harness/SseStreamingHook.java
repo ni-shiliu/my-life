@@ -19,16 +19,23 @@ import reactor.core.publisher.Mono;
 public class SseStreamingHook implements Hook {
 
     private int iterationCount = 0;
+    private volatile boolean completed = false;
     private SseEmitter currentEmitter;
 
     public void setEmitter(SseEmitter emitter) {
         this.currentEmitter = emitter;
         this.iterationCount = 0;
+        this.completed = false;
+    }
+
+    public void markCompleted() {
+        this.completed = true;
     }
 
     public void clearEmitter() {
         this.currentEmitter = null;
         this.iterationCount = 0;
+        this.completed = false;
     }
 
     @Override
@@ -39,11 +46,9 @@ public class SseStreamingHook implements Hook {
             log.info("ReAct第{}轮思考开始 | 消息数={}", iterationCount, msgCount);
         } else if (event instanceof ReasoningChunkEvent e) {
             String chunk = e.getIncrementalChunk().getTextContent();
-            if (chunk != null && !chunk.isEmpty()) {
-                if (currentEmitter != null) {
-                    SseEventHelper.emitEvent(currentEmitter, "STREAM_CHUNK",
-                            SseEventHelper.buildStreamChunkPayload(chunk));
-                }
+            if (chunk != null && !chunk.isEmpty() && currentEmitter != null && !completed) {
+                SseEventHelper.emitEvent(currentEmitter, "STREAM_CHUNK",
+                        SseEventHelper.buildStreamChunkPayload(chunk));
             }
         } else if (event instanceof PreActingEvent e) {
             String toolName = e.getToolUse().getName();
@@ -51,7 +56,7 @@ public class SseStreamingHook implements Hook {
                     ? e.getToolUse().getInput().toString() : "";
             log.info("ReAct第{}轮调用工具 | tool={}, args={}", iterationCount, toolName,
                     toolArgs.length() > 200 ? toolArgs.substring(0, 200) + "..." : toolArgs);
-            if (currentEmitter != null) {
+            if (currentEmitter != null && !completed) {
                 SseEventHelper.emitEvent(currentEmitter, "TOOL_CALL",
                         SseEventHelper.buildToolCallPayload(toolName, toolArgs));
             }
@@ -62,7 +67,7 @@ public class SseStreamingHook implements Hook {
                     result.length() > 500 ? result.substring(0, 500) + "..." : result);
         } else if (event instanceof ErrorEvent e) {
             log.error("ReAct第{}轮错误 | error={}", iterationCount, e.getError().getMessage());
-            if (currentEmitter != null) {
+            if (currentEmitter != null && !completed) {
                 SseEventHelper.emitEvent(currentEmitter, "ERROR",
                         SseEventHelper.buildErrorPayload("LLM_ERROR",
                                 e.getError().getMessage(), true));

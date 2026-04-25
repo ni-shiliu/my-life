@@ -1,26 +1,25 @@
 package com.mylife.entity;
 
 import com.baomidou.mybatisplus.annotation.*;
+import com.mylife.enums.ChatSceneEnum;
 import lombok.Data;
 
 import java.time.LocalDateTime;
 
 @Data
-@TableName("ml_context_memory")
-public class ContextMemoryDO {
+@TableName("ml_chat_room")
+public class ChatRoomDO {
 
     @TableId(type = IdType.AUTO)
     private Long id;
 
-    private Long roomId;
+    private String roomId;
 
     private Long userId;
 
-    private String agentId;
+    private String agentUuid;
 
-    private String content;
-
-    private Integer messageCount;
+    private ChatSceneEnum scene;
 
     @TableLogic
     private String isDeleted;

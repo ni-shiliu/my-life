@@ -28,6 +28,7 @@ public class TeacherHarness {
     private final Long userId;
     private final String agentUuid;
     private final ChatSceneEnum scene;
+    private final Long roomId;
     private final ReActAgent agent;
     private final AutoContextMemory memory;
     private final ChatMessageMapper chatMessageMapper;
@@ -40,6 +41,7 @@ public class TeacherHarness {
                           Long userId,
                           String agentUuid,
                           ChatSceneEnum scene,
+                          Long roomId,
                           ReActAgent agent,
                           AutoContextMemory memory,
                           ChatMessageMapper chatMessageMapper,
@@ -49,6 +51,7 @@ public class TeacherHarness {
         this.userId = userId;
         this.agentUuid = agentUuid;
         this.scene = scene;
+        this.roomId = roomId;
         this.agent = agent;
         this.memory = memory;
         this.chatMessageMapper = chatMessageMapper;
@@ -82,13 +85,16 @@ public class TeacherHarness {
 
             SseEventHelper.emitEvent(emitter, "STREAM_END",
                     SseEventHelper.buildStreamEndPayload(finalAnswer != null ? finalAnswer : ""));
+            sseHook.markCompleted();
             emitter.complete();
         } catch (BizException e) {
+            sseHook.markCompleted();
             SseEventHelper.emitEvent(emitter, "ERROR",
                     SseEventHelper.buildErrorPayload(e.getCode(), e.getMessage(), true));
             emitter.complete();
         } catch (Exception e) {
             log.error("聊天处理异常：harnessKey={}, error={}", harnessKey, e.getMessage(), e);
+            sseHook.markCompleted();
             SseEventHelper.emitEvent(emitter, "ERROR",
                     SseEventHelper.buildErrorPayload(ErrorCode.LLM_ERROR.getCode(), "AI服务暂时不可用", true));
             emitter.complete();
@@ -128,6 +134,8 @@ public class TeacherHarness {
 
     private void saveMessage(ChatRoleEnum role, String content, String toolName) {
         ChatMessageDO msg = new ChatMessageDO();
+        msg.setMessageId(java.util.UUID.randomUUID().toString());
+        msg.setRoomId(roomId);
         msg.setUserId(userId);
         msg.setAgentUuid(agentUuid);
         msg.setRole(role);

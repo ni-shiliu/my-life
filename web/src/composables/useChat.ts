@@ -1,7 +1,7 @@
 import { ref, type ComputedRef, type Ref } from 'vue'
 import { useUserStore } from '@/stores/user'
 import { useGuestAuth } from '@/composables/useGuestAuth'
-import { clearChatHistoryApi, getChatHistoryApi } from '@/api/chat'
+import { clearChatHistoryApi, clearMemoryApi, ensureChatRoomApi, getChatHistoryApi } from '@/api/chat'
 import { getToken } from '@/utils/storage'
 import type { ChatMessage, ChatScene, StreamChunkPayload, StreamEndPayload, ErrorPayload } from '@/types/chat'
 
@@ -10,6 +10,7 @@ export function useChat(agentUuid: Ref<string | undefined>, scene?: Ref<ChatScen
   const streaming = ref(false)
   const connected = ref(true) // SSE 无需维护连接状态，始终为 true
   const error = ref('')
+  const roomId = ref<string | null>(null)
 
   const userStore = useUserStore()
   const { getOrFetchToken } = useGuestAuth()
@@ -148,10 +149,24 @@ export function useChat(agentUuid: Ref<string | undefined>, scene?: Ref<ChatScen
     return getOrFetchToken()
   }
 
+  async function ensureRoom() {
+    if (!agentUuid.value || !userStore.isLoggedIn) return
+    try {
+      const { data } = await ensureChatRoomApi(agentUuid.value, scene?.value)
+      if (data?.data) {
+        roomId.value = data.data.roomId
+      }
+    } catch {
+      // silently fail
+    }
+  }
+
   async function loadHistory() {
     if (!agentUuid.value || !userStore.isLoggedIn) return
     try {
-      const { data } = await getChatHistoryApi(agentUuid.value, scene?.value)
+      await ensureRoom()
+      if (!roomId.value) return
+      const { data } = await getChatHistoryApi(roomId.value)
       if (data?.data) {
         messages.value = data.data.map(m => ({ ...m, streaming: false }))
       }
@@ -165,13 +180,22 @@ export function useChat(agentUuid: Ref<string | undefined>, scene?: Ref<ChatScen
   }
 
   async function clearHistory() {
-    if (!agentUuid.value) return
+    if (!agentUuid.value || !roomId.value) return
     try {
-      await clearChatHistoryApi(agentUuid.value, scene?.value)
+      await clearChatHistoryApi(roomId.value)
     } catch {
-      // API 失败仍清空前端，后端数据会在下次加载时重新拉取
+      // API 失败仍清空前端
     }
     messages.value = []
+  }
+
+  async function clearMemory() {
+    if (!agentUuid.value || !roomId.value) return
+    try {
+      await clearMemoryApi(roomId.value)
+    } catch {
+      // ignore
+    }
   }
 
   return {
@@ -182,6 +206,7 @@ export function useChat(agentUuid: Ref<string | undefined>, scene?: Ref<ChatScen
     sendMessage,
     loadHistory,
     clearMessages,
-    clearHistory
+    clearHistory,
+    clearMemory
   }
 }

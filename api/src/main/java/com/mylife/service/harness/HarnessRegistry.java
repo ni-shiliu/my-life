@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.mylife.common.BizException;
 import com.mylife.common.ErrorCode;
 import com.mylife.entity.AgentDO;
+import com.mylife.entity.ChatRoomDO;
 import com.mylife.entity.KnowledgeBaseDO;
 import com.mylife.entity.ChatMessageDO;
 import com.mylife.enums.ChatRoleEnum;
@@ -12,6 +13,7 @@ import com.mylife.mapper.AgentMapper;
 import com.mylife.mapper.ChatMessageMapper;
 import com.mylife.mapper.ContextMemoryMapper;
 import com.mylife.mapper.KnowledgeBaseMapper;
+import com.mylife.service.IChatRoomService;
 import io.agentscope.core.ReActAgent;
 import io.agentscope.core.message.Msg;
 import io.agentscope.core.message.MsgRole;
@@ -48,6 +50,7 @@ public class HarnessRegistry {
     private final AgentMapper agentMapper;
     private final ContextMemoryMapper contextMemoryMapper;
     private final KnowledgeBaseMapper knowledgeBaseMapper;
+    private final IChatRoomService chatRoomService;
 
 //    @Value("${llm.base-url}")
 //    private String baseUrl;
@@ -93,22 +96,34 @@ public class HarnessRegistry {
         }
     }
 
+    /**
+     * 销毁并移除 TeacherHarness 实例，不持久化记忆（用于清空记忆场景）。
+     */
+    public void removeWithoutPersist(Long userId, String agentUuid, ChatSceneEnum scene) {
+        String key = buildKey(userId, agentUuid, scene);
+        TeacherHarness harness = harnessMap.remove(key);
+        if (harness != null) {
+            log.info("销毁TeacherHarness（不持久化记忆）：key={}", key);
+        }
+    }
+
     private String buildKey(Long userId, String agentUuid, ChatSceneEnum scene) {
         return userId + "_" + agentUuid + "_" + scene.name();
     }
 
     private TeacherHarness createHarness(String key, Long userId, String agentUuid, ChatSceneEnum scene) {
         AgentDO agent = loadAndValidateAgent(agentUuid);
+        ChatRoomDO room = chatRoomService.getOrCreate(userId, agentUuid, scene);
 
         DashScopeChatModel model = buildStreamingModel();
         DashScopeChatModel compactModel = buildCompactModel();
 
         AutoContextMemory memory = new AutoContextMemory(
-                compactModel, contextMemoryMapper, userId, agentUuid);
+                compactModel, contextMemoryMapper, room.getId(), userId, agentUuid);
 
         // sysPrompt 由 ReActAgent.builder().sysPrompt() 管理，不再手动注入 memory
         loadHistoryToMemory(userId, agentUuid, memory);
-        String existingMemory = AutoContextMemory.loadLatestMemory(contextMemoryMapper, userId, agentUuid);
+        String existingMemory = AutoContextMemory.loadLatestMemory(contextMemoryMapper, room.getId());
         memory.restoreMemory(existingMemory);
 
         Toolkit toolkit = buildToolkit();
@@ -141,7 +156,7 @@ public class HarnessRegistry {
         ReActAgent reactAgent = agentBuilder.build();
 
         return new TeacherHarness(
-                key, userId, agentUuid, scene, reactAgent, memory,
+                key, userId, agentUuid, scene, room.getId(), reactAgent, memory,
                 chatMessageMapper, sseHook, compressionHook);
     }
 

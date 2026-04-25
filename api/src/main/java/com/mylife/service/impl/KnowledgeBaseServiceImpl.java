@@ -1,9 +1,12 @@
 package com.mylife.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.mylife.common.BizException;
 import com.mylife.common.ErrorCode;
 import com.mylife.dto.KnowledgeBaseDTO;
+import com.mylife.dto.KnowledgeBasePageQueryDTO;
 import com.mylife.dto.KnowledgeBaseSaveDTO;
 import com.mylife.entity.KnowledgeBaseDO;
 import com.mylife.enums.KbSourceEnum;
@@ -64,6 +67,19 @@ public class KnowledgeBaseServiceImpl implements IKnowledgeBaseService {
         return knowledgeBaseMapper.selectList(wrapper).stream()
                 .map(this::convertToDTO)
                 .collect(Collectors.toList());
+    }
+
+    @Override
+    public IPage<KnowledgeBaseDTO> listPage(Long userId, KnowledgeBasePageQueryDTO queryDTO) {
+        Page<KnowledgeBaseDO> page = new Page<>(queryDTO.getPage() + 1, queryDTO.getSize());
+        LambdaQueryWrapper<KnowledgeBaseDO> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(KnowledgeBaseDO::getUserId, userId);
+        if (queryDTO.getName() != null && !queryDTO.getName().isBlank()) {
+            wrapper.like(KnowledgeBaseDO::getName, queryDTO.getName());
+        }
+        wrapper.orderByDesc(KnowledgeBaseDO::getGmtModified);
+        IPage<KnowledgeBaseDO> doPage = knowledgeBaseMapper.selectPage(page, wrapper);
+        return doPage.convert(this::convertToDTO);
     }
 
     @Override

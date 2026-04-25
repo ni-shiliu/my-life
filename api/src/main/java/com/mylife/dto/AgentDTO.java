@@ -23,5 +23,9 @@ public class AgentDTO {
 
     private String status;
 
+    private Boolean owned;
+
+    private Boolean added;
+
     private String gmtModified;
 }

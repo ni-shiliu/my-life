@@ -267,7 +267,8 @@ const handleSave = async () => {
       systemPrompt: form.value.systemPrompt,
       iconIndex: form.value.iconIndex,
       color: form.value.color,
-      knowledgeBaseId: form.value.knowledgeBaseId
+      knowledgeBaseId: form.value.knowledgeBaseId,
+      resetToDraft: true
     })
     if (saved) {
       agent.value = saved

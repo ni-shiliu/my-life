@@ -1,15 +1,27 @@
 import request from './request'
 import type { ChatMessage, ChatScene, GuestTokenResponse } from '@/types/chat'
 
-export function getChatHistoryApi(agentUuid: string, scene?: ChatScene) {
-  return request.post<{ code: string; data: ChatMessage[] }>('/v1/chat/history', null, {
+export function ensureChatRoomApi(agentUuid: string, scene?: ChatScene) {
+  return request.post<{ code: string; data: { roomId: string } }>('/v1/chat/room', null, {
     params: { agentUuid, scene }
   })
 }
 
-export function clearChatHistoryApi(agentUuid: string, scene?: ChatScene) {
+export function getChatHistoryApi(roomId: string) {
+  return request.post<{ code: string; data: ChatMessage[] }>('/v1/chat/history', null, {
+    params: { roomId }
+  })
+}
+
+export function clearChatHistoryApi(roomId: string) {
   return request.delete<{ code: string; data: null }>('/v1/chat/clear', {
-    params: { agentUuid, scene }
+    params: { roomId }
+  })
+}
+
+export function clearMemoryApi(roomId: string) {
+  return request.delete<{ code: string; data: null }>('/v1/chat/clear-memory', {
+    params: { roomId }
   })
 }
 

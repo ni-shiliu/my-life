@@ -23,25 +23,28 @@ import java.util.List;
 @Slf4j
 public class AutoContextMemory implements Memory {
 
-    private static final int MAX_MESSAGES = 30;
-    private static final int KEEP_RECENT = 10;
+    private static final int MAX_MESSAGES = 4;
+    private static final int KEEP_RECENT = 2;
 
     private final List<Msg> messages = new ArrayList<>();
     private final ChatModelBase compactModel;
     private final ContextMemoryMapper contextMemoryMapper;
+    private final Long roomId;
     private final Long userId;
-    private final String agentUuid;
+    private final String agentId;
 
     private String persistedMemory;
 
     public AutoContextMemory(ChatModelBase compactModel,
                              ContextMemoryMapper contextMemoryMapper,
+                             Long roomId,
                              Long userId,
-                             String agentUuid) {
+                             String agentId) {
         this.compactModel = compactModel;
         this.contextMemoryMapper = contextMemoryMapper;
+        this.roomId = roomId;
         this.userId = userId;
-        this.agentUuid = agentUuid;
+        this.agentId = agentId;
     }
 
     /**
@@ -121,7 +124,7 @@ public class AutoContextMemory implements Memory {
 
         String summary = generateMemory(historyText.toString());
         if (summary == null || summary.isBlank()) {
-            log.warn("auto_compact生成记忆失败，跳过压缩：userId={}, agentUuid={}", userId, agentUuid);
+            log.warn("auto_compact生成记忆失败，跳过压缩：roomId={}", roomId);
             return;
         }
 
@@ -141,8 +144,7 @@ public class AutoContextMemory implements Memory {
 
         persistMemoryToDb(summary, compactCount);
 
-        log.info("auto_compact完成：userId={}, agentUuid={}, 压缩{}条消息",
-                userId, agentUuid, compactCount);
+        log.info("auto_compact完成：roomId={}, 压缩{}条消息", roomId, compactCount);
     }
 
     public String getPersistedMemory() {
@@ -169,8 +171,7 @@ public class AutoContextMemory implements Memory {
         String summary = generateMemory(historyText.toString());
         if (summary != null && !summary.isBlank()) {
             persistMemoryToDb(summary, messages.size());
-            log.info("回收前持久化记忆：userId={}, agentUuid={}, 消息数={}",
-                    userId, agentUuid, messages.size());
+            log.info("回收前持久化记忆：roomId={}, 消息数={}", roomId, messages.size());
         }
     }
 
@@ -209,16 +210,16 @@ public class AutoContextMemory implements Memory {
             }
             return sb.toString().isBlank() ? null : sb.toString();
         } catch (Exception e) {
-            log.error("生成上下文记忆失败：userId={}, agentUuid={}, error={}",
-                    userId, agentUuid, e.getMessage());
+            log.error("生成上下文记忆失败：roomId={}, error={}", roomId, e.getMessage());
             return null;
         }
     }
 
     private void persistMemoryToDb(String content, int messageCount) {
         ContextMemoryDO memoryDO = new ContextMemoryDO();
+        memoryDO.setRoomId(roomId);
         memoryDO.setUserId(userId);
-        memoryDO.setAgentUuid(agentUuid);
+        memoryDO.setAgentId(agentId);
         memoryDO.setContent(content);
         memoryDO.setMessageCount(messageCount);
         contextMemoryMapper.insert(memoryDO);
@@ -227,10 +228,9 @@ public class AutoContextMemory implements Memory {
     /**
      * 从DB加载最新的上下文记忆。
      */
-    public static String loadLatestMemory(ContextMemoryMapper mapper, Long userId, String agentUuid) {
+    public static String loadLatestMemory(ContextMemoryMapper mapper, Long roomId) {
         LambdaQueryWrapper<ContextMemoryDO> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(ContextMemoryDO::getUserId, userId)
-               .eq(ContextMemoryDO::getAgentUuid, agentUuid)
+        wrapper.eq(ContextMemoryDO::getRoomId, roomId)
                .orderByDesc(ContextMemoryDO::getGmtCreated)
                .last("LIMIT 1");
         ContextMemoryDO memoryDO = mapper.selectOne(wrapper);

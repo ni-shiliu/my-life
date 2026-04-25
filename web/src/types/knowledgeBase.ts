@@ -18,3 +18,11 @@ export interface BaseResult<T> {
   message: string
   data: T | null
 }
+
+export interface PageResult<T> {
+  records: T[]
+  total: number
+  size: number
+  current: number
+  pages: number
+}

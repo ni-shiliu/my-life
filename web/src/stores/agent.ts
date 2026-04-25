@@ -1,11 +1,14 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import type { AgentDTO, AgentSaveDTO } from '@/types/agent'
-import { saveAgentApi, deleteAgentApi, listAgentApi, publishAgentApi } from '@/api/agent'
+import { saveAgentApi, deleteAgentApi, listAgentApi, listAgentPageApi, publishAgentApi } from '@/api/agent'
 
 export const useAgentStore = defineStore('agent', () => {
   const agents = ref<AgentDTO[]>([])
   const loading = ref(false)
+  const currentPage = ref(0)
+  const totalPages = ref(0)
+  const pageSize = 6
 
   async function loadAgents() {
     loading.value = true
@@ -17,32 +20,40 @@ export const useAgentStore = defineStore('agent', () => {
     }
   }
 
+  async function loadAgentsPage(page?: number) {
+    loading.value = true
+    try {
+      if (page !== undefined) currentPage.value = page
+      const { data } = await listAgentPageApi({
+        page: currentPage.value,
+        size: pageSize
+      })
+      const p = data?.data
+      agents.value = p?.records ?? []
+      totalPages.value = p?.pages ?? 0
+    } finally {
+      loading.value = false
+    }
+  }
+
   async function saveAgent(dto: AgentSaveDTO): Promise<AgentDTO | null> {
     const { data } = await saveAgentApi(dto)
     const saved = data?.data ?? null
     if (saved) {
-      const idx = agents.value.findIndex(a => a.uuid === saved.uuid)
-      if (idx >= 0) {
-        agents.value[idx] = saved
-      } else {
-        agents.value.unshift(saved)
-      }
+      await loadAgentsPage()
     }
     return saved
   }
 
   async function deleteAgent(uuid: string) {
     await deleteAgentApi(uuid)
-    agents.value = agents.value.filter(a => a.uuid !== uuid)
+    await loadAgentsPage()
   }
 
   async function publishAgent(uuid: string) {
     await publishAgentApi(uuid)
-    const agent = agents.value.find(a => a.uuid === uuid)
-    if (agent) {
-      agent.status = 'PUBLISHED'
-    }
+    await loadAgentsPage()
   }
 
-  return { agents, loading, loadAgents, saveAgent, deleteAgent, publishAgent }
+  return { agents, loading, currentPage, totalPages, pageSize, loadAgents, loadAgentsPage, saveAgent, deleteAgent, publishAgent }
 })

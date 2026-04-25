@@ -28,7 +28,7 @@ cd web && npm run dev                # 开发服务器 (localhost:5173)
 npm run build                       # 构建（vue-tsc 类型检查 + vite build）
 ```
 
-**数据库初始化**: `api/sql/init.sql` — 4张表：`ml_user`, `ml_agent`, `ml_chat_message`, `ml_context_memory`
+**数据库初始化**: `api/sql/init.sql` — 6张表：`ml_user`, `ml_agent`, `ml_chat_room`, `ml_chat_message`, `ml_context_memory`, `ml_knowledge_base`
 
 ## 核心架构
 
@@ -44,8 +44,9 @@ npm run build                       # 构建（vue-tsc 类型检查 + vite build
                                                                         MySQL (持久化)
 ```
 
+- **ChatRoomService** (`service/impl/ChatRoomServiceImpl`): 管理聊天室（`ml_chat_room`），每个 `(userId, agentUuid, scene)` 对应一个聊天室。PUBLISHED 场景 uuid 有值，EDIT 场景 uuid 为 null。消息通过 `room_id` 关联聊天室。
 - **HarnessRegistry** (`service/harness/`): Spring Bean，按 `userId_agentUuid_scene` 管理 TeacherHarness 实例生命周期（`ConcurrentHashMap.computeIfAbsent` 创建/复用，remove 销毁）
-- **TeacherHarness**: 非 Spring Bean，持有会话状态，`ReentrantLock` 防并发，`lastActiveAt` 追踪空闲
+- **TeacherHarness**: 非 Spring Bean，持有会话状态和 roomId，`ReentrantLock` 防并发，`lastActiveAt` 追踪空闲
 - **ReActAgent**: AgentScope SDK 的 ReAct 模式，maxIterations 由 `llm.max-iterations` 配置（默认10）
 - **AutoContextMemory**: 实现 SDK `Memory` 接口，非 Spring Bean，消息超 30 条时保留最近 10 条 + LLM 摘要
 - **SseStreamingHook**: 实现 SDK `Hook` 接口，拦截 ReasoningChunk/PreActing/PostActing/ErrorEvent 推送 SSE
@@ -58,6 +59,15 @@ npm run build                       # 构建（vue-tsc 类型检查 + vite build
 - `TOOL_CALL` — Agent 调用工具
 - `ERROR` — 错误信息
 - `STREAM_END` — 对话结束（携带完整回复文本）
+
+### 三层数据加载
+
+### 聊天室模型
+
+每个 `(userId, agentUuid, scene)` 组合对应一个 `ml_chat_room` 记录。消息通过 `room_id` 关联聊天室。
+- EDIT 场景：聊天室 `uuid` 为 null（临时预览），清空时按 roomId 删除
+- PUBLISHED 场景：聊天室 `uuid` 有值（正式对话），清空时按 roomId 删除
+- 每条消息必须有 `message_id`（UUID），通过 `room_id` 关联聊天室
 
 ### 三层数据加载
 
@@ -94,7 +104,7 @@ my-life/
 │   └── src/main/java/com/mylife/
 │       ├── common/       # BaseResult, BizException, ErrorCode, GlobalExceptionHandler
 │       ├── config/       # SecurityConfig, MyBatisMetaObjectHandler, ApiLogAspect
-│       ├── controller/   # UserController, AgentController, ChatController
+│       ├── controller/   # UserController, AgentController, ChatController, KnowledgeBaseController
 │       ├── dto/          # 请求/响应 DTO
 │       ├── entity/       # {Domain}DO 实体类
 │       ├── enums/        # ChatRoleEnum, ChatSceneEnum, AgentStatusEnum
@@ -103,6 +113,7 @@ my-life/
 │       ├── service/      # I{Domain}Service 接口
 │       │   ├── harness/  # 核心会话管理（HarnessRegistry, TeacherHarness, Hooks, AutoContextMemory）
 │       │   └── tool/     # Agent 工具（CalculateTool, UpdateStudentProfileTool, AdvanceTeachingPlanTool）
+│       │   └── impl/     # Service 实现（ChatRoomServiceImpl 管理聊天室）
 │       └── util/
 ├── web/          # Vue 3 前端
 │   └── src/
@@ -110,7 +121,7 @@ my-life/
 │       ├── composables/  # useAuth, useChat, useGuestAuth, usePasswordRule
 │       ├── router/       # Vue Router 路由守卫
 │       ├── stores/       # Pinia stores（user, agent）
-│       ├── types/        # TypeScript 类型定义
+│       ├── types/        # TypeScript 类型定义（agent, chat, user, knowledgeBase）
 │       └── views/        # LoginView, RegisterView, HomeView, ChatView, AgentEditView
 └── doc/          # 架构文档 (PlantUML)
 ```

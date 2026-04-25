@@ -3,6 +3,8 @@ export type ChatScene = 'EDIT' | 'PUBLISHED'
 
 export interface ChatMessage {
   id?: number
+  messageId?: string
+  roomId?: number
   role: ChatRole
   content: string
   toolName?: string

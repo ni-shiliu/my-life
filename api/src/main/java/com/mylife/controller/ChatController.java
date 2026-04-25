@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.util.List;
+import java.util.Map;
 
 @Slf4j
 @RestController
@@ -31,18 +32,31 @@ public class ChatController {
         return chatService.chat(userId, sendDTO.getAgentUuid(), sendDTO.getMessage(), sendDTO.getScene());
     }
 
-    @PostMapping("/history")
-    public BaseResult<List<ChatMessageDTO>> history(@RequestParam String agentUuid,
-                                                     @RequestParam(required = false) ChatSceneEnum scene) {
+    @PostMapping("/room")
+    public BaseResult<Map<String, Object>> ensureRoom(@RequestParam String agentUuid,
+                                                       @RequestParam(required = false) ChatSceneEnum scene) {
         Long userId = SecurityUtils.getUserId();
-        return BaseResult.success(chatService.getHistory(userId, agentUuid, scene));
+        String roomId = chatService.ensureRoom(userId, agentUuid, scene);
+        return BaseResult.success(Map.of("roomId", roomId));
+    }
+
+    @PostMapping("/history")
+    public BaseResult<List<ChatMessageDTO>> history(@RequestParam String roomId) {
+        Long userId = SecurityUtils.getUserId();
+        return BaseResult.success(chatService.getHistory(userId, roomId));
     }
 
     @DeleteMapping("/clear")
-    public BaseResult<Void> clear(@RequestParam String agentUuid,
-                                   @RequestParam(required = false) ChatSceneEnum scene) {
+    public BaseResult<Void> clear(@RequestParam String roomId) {
         Long userId = SecurityUtils.getUserId();
-        chatService.clearHistory(userId, agentUuid, scene);
+        chatService.clearHistory(userId, roomId);
+        return BaseResult.success(null);
+    }
+
+    @DeleteMapping("/clear-memory")
+    public BaseResult<Void> clearMemory(@RequestParam String roomId) {
+        Long userId = SecurityUtils.getUserId();
+        chatService.clearMemory(userId, roomId);
         return BaseResult.success(null);
     }
 }

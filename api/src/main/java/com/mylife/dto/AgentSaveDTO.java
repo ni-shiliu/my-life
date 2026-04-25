@@ -23,4 +23,6 @@ public class AgentSaveDTO {
     private String systemPrompt;
 
     private Long knowledgeBaseId;
+
+    private Boolean resetToDraft;
 }

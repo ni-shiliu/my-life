@@ -50,9 +50,29 @@ CREATE TABLE IF NOT EXISTS `ml_agent` (
     UNIQUE INDEX `uniq_user_name` (`user_id`, `name`, `is_deleted`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- 聊天室表
+CREATE TABLE IF NOT EXISTS `ml_chat_room` (
+    `id`            BIGINT       NOT NULL AUTO_INCREMENT,
+    `room_id`       VARCHAR(36)  NOT NULL COMMENT '聊天室唯一标识，UUID格式',
+    `user_id`       BIGINT       NOT NULL COMMENT '用户ID',
+    `agent_uuid`    VARCHAR(36)  NOT NULL COMMENT '智能体UUID',
+    `scene`         VARCHAR(16)  NOT NULL DEFAULT 'PUBLISHED' COMMENT '场景：EDIT/PUBLISHED',
+    `is_deleted`    CHAR(1)      NOT NULL DEFAULT 'N',
+    `gmt_created`   DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `creator`       VARCHAR(64)  NOT NULL DEFAULT 'system',
+    `gmt_modified`  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    `modifier`      VARCHAR(64)  NOT NULL DEFAULT 'system',
+    PRIMARY KEY (`id`),
+    UNIQUE INDEX `uniq_room_id` (`room_id`),
+    UNIQUE INDEX `uniq_user_agent_scene` (`user_id`, `agent_uuid`, `scene`, `is_deleted`),
+    INDEX `idx_user_id` (`user_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='聊天室表';
+
 -- 聊天消息表
 CREATE TABLE IF NOT EXISTS `ml_chat_message` (
     `id`            BIGINT       NOT NULL AUTO_INCREMENT,
+    `message_id`    VARCHAR(36)  NOT NULL COMMENT '消息唯一标识',
+    `room_id`       BIGINT       DEFAULT NULL COMMENT '聊天室表ID',
     `user_id`       BIGINT       DEFAULT NULL COMMENT '用户ID，游客为NULL',
     `agent_uuid`    VARCHAR(36)  NOT NULL COMMENT '智能体UUID',
     `role`          VARCHAR(16)  NOT NULL COMMENT '角色：USER,ASSISTANT,SYSTEM,TOOL_RESULT',
@@ -65,6 +85,8 @@ CREATE TABLE IF NOT EXISTS `ml_chat_message` (
     `gmt_modified`  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
     `modifier`      VARCHAR(64)  NOT NULL DEFAULT 'system' COMMENT '更新人',
     PRIMARY KEY (`id`),
+    UNIQUE INDEX `uniq_message_id` (`message_id`),
+    INDEX `idx_room_id` (`room_id`),
     INDEX `idx_user_agent_created` (`user_id`, `agent_uuid`, `gmt_created`),
     INDEX `idx_user_agent_scene` (`user_id`, `agent_uuid`, `scene`, `gmt_created`),
     INDEX `idx_agent_uuid` (`agent_uuid`)
@@ -73,8 +95,9 @@ CREATE TABLE IF NOT EXISTS `ml_chat_message` (
 -- 上下文记忆表
 CREATE TABLE IF NOT EXISTS `ml_context_memory` (
     `id`              BIGINT       NOT NULL AUTO_INCREMENT,
+    `room_id`         BIGINT       NOT NULL COMMENT '聊天室表ID',
     `user_id`         BIGINT       NOT NULL COMMENT '用户ID',
-    `agent_uuid`      VARCHAR(36)  NOT NULL COMMENT '智能体UUID',
+    `agent_id`        VARCHAR(36)  NOT NULL COMMENT '智能体UUID',
     `content`         TEXT         NOT NULL COMMENT 'LLM生成的上下文记忆',
     `message_count`   INT          NOT NULL DEFAULT 0 COMMENT '被压缩的消息数',
     `is_deleted`      CHAR(1)      NOT NULL DEFAULT 'N' COMMENT '是否删除：Y-是，N-否',
@@ -83,7 +106,8 @@ CREATE TABLE IF NOT EXISTS `ml_context_memory` (
     `gmt_modified`    DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
     `modifier`        VARCHAR(64)  NOT NULL DEFAULT 'system' COMMENT '更新人',
     PRIMARY KEY (`id`),
-    INDEX `idx_user_agent` (`user_id`, `agent_uuid`)
+    INDEX `idx_room_id` (`room_id`),
+    INDEX `idx_user_agent` (`user_id`, `agent_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='上下文记忆表';
 
 -- 知识库表
@@ -103,3 +127,18 @@ CREATE TABLE IF NOT EXISTS `ml_knowledge_base` (
     UNIQUE INDEX `uniq_uuid` (`uuid`),
     INDEX `idx_user_id` (`user_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='知识库表';
+
+-- 用户-智能体关系表
+CREATE TABLE IF NOT EXISTS `ml_user_agent` (
+    `id`            BIGINT       NOT NULL AUTO_INCREMENT,
+    `user_id`       BIGINT       NOT NULL COMMENT '用户ID',
+    `agent_uuid`    VARCHAR(36)  NOT NULL COMMENT '智能体UUID',
+    `is_deleted`    VARCHAR(32)  NOT NULL DEFAULT 'N' COMMENT '是否删除：N-否，其他-已删除记录的id',
+    `gmt_created`   DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `creator`       VARCHAR(64)  NOT NULL DEFAULT 'system' COMMENT '创建人',
+    `gmt_modified`  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    `modifier`      VARCHAR(64)  NOT NULL DEFAULT 'system' COMMENT '更新人',
+    PRIMARY KEY (`id`),
+    UNIQUE INDEX `uniq_user_agent` (`user_id`, `agent_uuid`, `is_deleted`),
+    INDEX `idx_user_id` (`user_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='用户-智能体关系表';
