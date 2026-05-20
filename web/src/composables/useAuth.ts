@@ -2,6 +2,7 @@ import { ref } from 'vue'
 import { useUserStore } from '@/stores/user'
 import { useRouter } from 'vue-router'
 import { showToast } from '@/components/auth/toast-state'
+import { claimGuestHistoryIfPending } from '@/composables/useGuestAuth'
 
 export function useAuth() {
   const userStore = useUserStore()
@@ -14,6 +15,7 @@ export function useAuth() {
     errorMessage.value = ''
     try {
       await userStore.login(phone, password)
+      await claimGuestHistoryIfPending()
       const redirect = (router.currentRoute.value.query.redirect as string) || '/'
       router.push(redirect)
     } catch (e: any) {
@@ -29,6 +31,7 @@ export function useAuth() {
     errorMessage.value = ''
     try {
       await userStore.register(phone, password, nickName)
+      await claimGuestHistoryIfPending()
       const redirect = (router.currentRoute.value.query.redirect as string) || '/'
       router.push(redirect)
     } catch (e: any) {

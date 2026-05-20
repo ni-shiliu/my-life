@@ -14,6 +14,10 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Optional;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReentrantLock;
 
 /**
@@ -36,6 +40,7 @@ public class TeacherHarness {
     private final ContextCompressionHook compressionHook;
     private final ReentrantLock lock;
     private volatile Instant lastActiveAt;
+    private volatile boolean claimed;
 
     public TeacherHarness(String harnessKey,
                           Long userId,
@@ -67,6 +72,13 @@ public class TeacherHarness {
     public void chat(String message, SseEmitter emitter) {
         lock.lock();
         try {
+            if (claimed) {
+                SseEventHelper.emitEvent(emitter, "ERROR",
+                        SseEventHelper.buildErrorPayload("GUEST_CLAIMED",
+                                "访客会话已归并到您的账号，请刷新页面继续对话", false));
+                emitter.complete();
+                return;
+            }
             lastActiveAt = Instant.now();
             sseHook.setEmitter(emitter);
 
@@ -121,6 +133,32 @@ public class TeacherHarness {
         memory.persistBeforeRecycle();
         log.info("Harness回收持久化：key={}", harnessKey);
     }
+
+    /**
+     * 抢占式归并：先 tryLock 限时拿锁，成功则标记 claimed 并复制内存快照后释放锁。
+     * 调用方应已在调用前从 HarnessRegistry.harnessMap 摘除本实例，避免新请求拿到。
+     */
+    public Optional<ClaimSnapshot> tryClaim() {
+        boolean acquired;
+        try {
+            acquired = lock.tryLock(2, TimeUnit.SECONDS);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return Optional.empty();
+        }
+        if (!acquired) {
+            return Optional.empty();
+        }
+        try {
+            claimed = true;
+            List<Msg> snapshot = new ArrayList<>(memory.getMessages());
+            return Optional.of(new ClaimSnapshot(snapshot, memory.getPersistedMemory()));
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    public record ClaimSnapshot(List<Msg> messages, String persistedMemory) {}
 
     public boolean isIdle(long thresholdMs) {
         return Duration.between(lastActiveAt, Instant.now()).toMillis() > thresholdMs;

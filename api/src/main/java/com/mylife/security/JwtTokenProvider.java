@@ -73,6 +73,27 @@ public class JwtTokenProvider {
         }
     }
 
+    /**
+     * 校验签名但容忍过期。用于访客对话归并：登录后允许用过期 guest token 取出 guestId，
+     * 不验签则会被恶意构造冒领他人会话。
+     */
+    public JwtClaims validateAllowExpired(String token) {
+        try {
+            Claims claims = Jwts.parser()
+                    .verifyWith(getSigningKey())
+                    .build()
+                    .parseSignedClaims(token)
+                    .getPayload();
+            return buildJwtClaims(claims);
+        } catch (ExpiredJwtException e) {
+            return buildJwtClaims(e.getClaims());
+        } catch (BizException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new BizException(ErrorCode.TOKEN_INVALID.getCode(), ErrorCode.TOKEN_INVALID.getMessage());
+        }
+    }
+
     private JwtClaims buildJwtClaims(Claims claims) {
         String type = claims.get(CLAIM_TYPE, String.class);
         if (TYPE_ACCESS.equals(type)) {

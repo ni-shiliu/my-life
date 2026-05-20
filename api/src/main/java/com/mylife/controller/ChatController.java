@@ -3,11 +3,13 @@ package com.mylife.controller;
 import com.mylife.common.BaseResult;
 import com.mylife.common.BizException;
 import com.mylife.common.ErrorCode;
+import com.mylife.dto.ChatClaimGuestDTO;
 import com.mylife.dto.ChatMessageDTO;
 import com.mylife.dto.ChatSendDTO;
 import com.mylife.enums.ChatSceneEnum;
 import com.mylife.security.SecurityUtils;
 import com.mylife.service.IChatService;
+import com.mylife.service.harness.HarnessRegistry;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -85,5 +87,19 @@ public class ChatController {
         Long userId = SecurityUtils.getUserId();
         chatService.clearMemory(userId, roomId);
         return BaseResult.success(null);
+    }
+
+    @PostMapping("/claim-guest")
+    public BaseResult<Map<String, Object>> claimGuest(@Valid @RequestBody ChatClaimGuestDTO claimDTO) {
+        if (SecurityUtils.isGuest()) {
+            throw new BizException(ErrorCode.PARAM_ILLEGAL.getCode(), "访客身份不能调用归并接口");
+        }
+        Long userId = SecurityUtils.getUserId();
+        HarnessRegistry.ClaimResult result = chatService.claimGuestHistory(userId, claimDTO.getGuestToken());
+        log.info("访客归并接口完成：userId={}, count={}, agents={}",
+                userId, result.messageCount(), result.agentUuids());
+        return BaseResult.success(Map.of(
+                "count", result.messageCount(),
+                "agentUuids", result.agentUuids()));
     }
 }

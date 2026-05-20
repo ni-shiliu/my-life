@@ -2,6 +2,7 @@ package com.mylife.service;
 
 import com.mylife.dto.ChatMessageDTO;
 import com.mylife.enums.ChatSceneEnum;
+import com.mylife.service.harness.HarnessRegistry;
 
 import java.util.List;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
@@ -19,4 +20,6 @@ public interface IChatService {
     void clearHistory(Long userId, String roomId);
 
     void clearMemory(Long userId, String roomId);
+
+    HarnessRegistry.ClaimResult claimGuestHistory(Long userId, String guestToken);
 }

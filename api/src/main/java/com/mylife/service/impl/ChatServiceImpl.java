@@ -9,6 +9,8 @@ import com.mylife.entity.ChatRoomDO;
 import com.mylife.enums.ChatRoleEnum;
 import com.mylife.enums.ChatSceneEnum;
 import com.mylife.mapper.ChatMessageMapper;
+import com.mylife.security.JwtClaims;
+import com.mylife.security.JwtTokenProvider;
 import com.mylife.service.IChatRoomService;
 import com.mylife.service.IChatService;
 import com.mylife.service.harness.HarnessRegistry;
@@ -39,6 +41,7 @@ public class ChatServiceImpl implements IChatService {
     private final HarnessRegistry harnessRegistry;
     private final ChatMessageMapper chatMessageMapper;
     private final IChatRoomService chatRoomService;
+    private final JwtTokenProvider jwtTokenProvider;
     private final ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor();
 
     @Override
@@ -114,7 +117,7 @@ public class ChatServiceImpl implements IChatService {
         ChatRoomDO room = chatRoomService.getAndCheckOwnerByRoomId(userId, roomId);
         LambdaQueryWrapper<ChatMessageDO> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(ChatMessageDO::getRoomId, room.getId())
-               .orderByDesc(ChatMessageDO::getGmtCreated)
+               .orderByDesc(ChatMessageDO::getGmtCreated, ChatMessageDO::getId)
                .last("LIMIT " + MAX_HISTORY);
         List<ChatMessageDO> list = chatMessageMapper.selectList(wrapper);
         Collections.reverse(list);
@@ -147,5 +150,14 @@ public class ChatServiceImpl implements IChatService {
         dto.setToolName(entity.getToolName());
         dto.setGmtCreated(entity.getGmtCreated());
         return dto;
+    }
+
+    @Override
+    public HarnessRegistry.ClaimResult claimGuestHistory(Long userId, String guestToken) {
+        JwtClaims claims = jwtTokenProvider.validateAllowExpired(guestToken);
+        if (!"guest".equals(claims.getType()) || claims.getGuestId() == null) {
+            throw new BizException(ErrorCode.TOKEN_INVALID.getCode(), "无效的访客凭证");
+        }
+        return harnessRegistry.claimGuestHarnesses(claims.getGuestId(), userId);
     }
 }

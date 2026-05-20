@@ -5,6 +5,7 @@ import com.mylife.common.BizException;
 import com.mylife.common.ErrorCode;
 import com.mylife.entity.AgentDO;
 import com.mylife.entity.ChatRoomDO;
+import com.mylife.entity.ContextMemoryDO;
 import com.mylife.entity.KnowledgeBaseDO;
 import com.mylife.entity.ChatMessageDO;
 import com.mylife.enums.AgentStatusEnum;
@@ -30,8 +31,12 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
+import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -304,7 +309,7 @@ public class HarnessRegistry {
         LambdaQueryWrapper<ChatMessageDO> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(ChatMessageDO::getUserId, userId)
                .eq(ChatMessageDO::getAgentUuid, agentUuid)
-               .orderByDesc(ChatMessageDO::getGmtCreated)
+               .orderByDesc(ChatMessageDO::getGmtCreated, ChatMessageDO::getId)
                .last("LIMIT " + MAX_HISTORY);
         List<ChatMessageDO> list = chatMessageMapper.selectList(wrapper);
         Collections.reverse(list);
@@ -328,4 +333,103 @@ public class HarnessRegistry {
                 .register(HarnessUserContext.ofGuest(guestId, agentUuid))
                 .build();
     }
+
+    /**
+     * 把当前内存中所有属于该访客的 harness 归并到登录账号下：
+     * 把消息列表写入 ml_chat_message、压缩摘要写入 ml_context_memory，并销毁访客 harness。
+     */
+    public ClaimResult claimGuestHarnesses(String guestId, Long userId) {
+        String prefix = GUEST_KEY_PREFIX + guestId + "_";
+        String suffix = "_" + ChatSceneEnum.PUBLISHED.name();
+        List<String> keys = harnessMap.keySet().stream()
+                .filter(k -> k.startsWith(prefix) && k.endsWith(suffix))
+                .toList();
+
+        int totalMessages = 0;
+        List<String> claimedAgents = new ArrayList<>();
+        for (String key : keys) {
+            TeacherHarness harness = harnessMap.remove(key);
+            if (harness == null) {
+                continue;
+            }
+            String agentUuid = key.substring(prefix.length(), key.length() - suffix.length());
+            try {
+                int written = claimSingleHarness(harness, agentUuid, userId);
+                if (written > 0) {
+                    totalMessages += written;
+                    claimedAgents.add(agentUuid);
+                }
+            } catch (Exception e) {
+                log.error("归并访客 harness 失败：key={}, error={}", key, e.getMessage(), e);
+            }
+        }
+        log.info("访客归并完成：guestId={}, userId={}, totalMessages={}, agents={}",
+                guestId, userId, totalMessages, claimedAgents);
+        return new ClaimResult(totalMessages, claimedAgents);
+    }
+
+    private int claimSingleHarness(TeacherHarness harness, String agentUuid, Long userId) {
+        Optional<TeacherHarness.ClaimSnapshot> opt = harness.tryClaim();
+        if (opt.isEmpty()) {
+            log.warn("归并跳过(锁占用或被中断)：agentUuid={}", agentUuid);
+            return 0;
+        }
+        TeacherHarness.ClaimSnapshot snapshot = opt.get();
+        ChatRoomDO room = chatRoomService.getOrCreate(userId, agentUuid, ChatSceneEnum.PUBLISHED);
+
+        int written = writeMessagesToRoom(snapshot.messages(), room.getId(), userId, agentUuid);
+        if (snapshot.persistedMemory() != null && !snapshot.persistedMemory().isBlank()) {
+            ContextMemoryDO memoryDO = new ContextMemoryDO();
+            memoryDO.setRoomId(room.getId());
+            memoryDO.setUserId(userId);
+            memoryDO.setAgentId(agentUuid);
+            memoryDO.setContent(snapshot.persistedMemory());
+            memoryDO.setMessageCount(snapshot.messages().size());
+            contextMemoryMapper.insert(memoryDO);
+        }
+        log.info("归并成功：agentUuid={}, written={}, hasSummary={}",
+                agentUuid, written, snapshot.persistedMemory() != null);
+        return written;
+    }
+
+    private int writeMessagesToRoom(List<Msg> messages, Long roomDbId, Long userId, String agentUuid) {
+        int written = 0;
+        LocalDateTime base = LocalDateTime.now();
+        int idx = 0;
+        for (Msg msg : messages) {
+            ChatRoleEnum role = mapMsgRole(msg.getRole());
+            if (role == null) {
+                continue; // 跳过 sysPrompt / 对话记忆等 SYSTEM 消息
+            }
+            String content = msg.getTextContent();
+            if (content == null || content.isBlank()) {
+                continue;
+            }
+            ChatMessageDO entity = new ChatMessageDO();
+            entity.setMessageId(UUID.randomUUID().toString());
+            entity.setRoomId(roomDbId);
+            entity.setUserId(userId);
+            entity.setAgentUuid(agentUuid);
+            entity.setRole(role);
+            entity.setContent(content);
+            entity.setScene(ChatSceneEnum.PUBLISHED);
+            entity.setGmtCreated(base.plusNanos((long) idx * 1_000_000L));
+            chatMessageMapper.insert(entity);
+            idx++;
+            written++;
+        }
+        return written;
+    }
+
+    private ChatRoleEnum mapMsgRole(MsgRole role) {
+        if (role == MsgRole.USER) {
+            return ChatRoleEnum.USER;
+        }
+        if (role == MsgRole.ASSISTANT) {
+            return ChatRoleEnum.ASSISTANT;
+        }
+        return null;
+    }
+
+    public record ClaimResult(int messageCount, List<String> agentUuids) {}
 }
