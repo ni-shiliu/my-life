@@ -177,6 +177,16 @@
                     </svg>
                     对话
                   </button>
+                  <button v-if="agent.status === 'PUBLISHED'" class="btn-ghost btn-sm" @click="shareAgent(agent)" aria-label="分享">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <circle cx="18" cy="5" r="3"/>
+                      <circle cx="6" cy="12" r="3"/>
+                      <circle cx="18" cy="19" r="3"/>
+                      <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/>
+                      <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>
+                    </svg>
+                    分享
+                  </button>
                   <button class="btn-ghost btn-sm" @click="openEditDialog(agent)" aria-label="编辑">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                       <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
@@ -505,6 +515,7 @@ import { saveKnowledgeBaseApi, deleteKnowledgeBaseApi, listKnowledgeBasePageApi 
 import { queryPublishedAgentApi, addAgentApi, removeAgentApi } from '@/api/agent'
 import type { AgentDTO } from '@/types/agent'
 import type { KnowledgeBaseDTO } from '@/types/knowledgeBase'
+import { showToast } from '@/components/auth/toast-state'
 
 import { h } from 'vue'
 
@@ -733,6 +744,15 @@ const startChat = async (agent: AgentDTO) => {
     }
   }
   router.push(`/chat/${agent.uuid}`)
+}
+
+const shareAgent = (agent: AgentDTO) => {
+  const url = `${window.location.origin}/chat/${agent.uuid}`
+  navigator.clipboard.writeText(url).then(() => {
+    showToast('链接已复制', 'success')
+  }).catch(() => {
+    showToast('复制失败，请手动复制', 'error')
+  })
 }
 
 const goToEdit = (agent: AgentDTO) => {

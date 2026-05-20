@@ -7,6 +7,7 @@ import com.mylife.common.BizException;
 import com.mylife.common.ErrorCode;
 import com.mylife.dto.AgentDTO;
 import com.mylife.dto.AgentPageQueryDTO;
+import com.mylife.dto.AgentPublicDTO;
 import com.mylife.dto.AgentSaveDTO;
 import com.mylife.entity.AgentDO;
 import com.mylife.entity.KnowledgeBaseDO;
@@ -81,6 +82,19 @@ public class AgentServiceImpl implements IAgentService {
         }
         Map<Long, String> kbNameMap = buildKbNameMap(List.of(agentDO));
         return convertToDTO(agentDO, kbNameMap);
+    }
+
+    @Override
+    public AgentPublicDTO getPublishedAgentByUuid(String uuid) {
+        LambdaQueryWrapper<AgentDO> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(AgentDO::getUuid, uuid)
+               .eq(AgentDO::getStatus, AgentStatusEnum.PUBLISHED)
+               .last("LIMIT 1");
+        AgentDO agent = agentMapper.selectOne(wrapper);
+        if (agent == null) {
+            throw new BizException(ErrorCode.PARAM_ILLEGAL.getCode(), "智能体不存在或未发布");
+        }
+        return convertToPublicDTO(agent);
     }
 
     @Override
@@ -279,6 +293,16 @@ public class AgentServiceImpl implements IAgentService {
         }
         dto.setGmtModified(agentDO.getGmtModified() != null
                 ? agentDO.getGmtModified().toString() : null);
+        return dto;
+    }
+
+    private AgentPublicDTO convertToPublicDTO(AgentDO agentDO) {
+        AgentPublicDTO dto = new AgentPublicDTO();
+        dto.setUuid(agentDO.getUuid());
+        dto.setName(agentDO.getName());
+        dto.setDescription(agentDO.getDescription());
+        dto.setColor(agentDO.getColor());
+        dto.setIconIndex(agentDO.getIconIndex());
         return dto;
     }
 }

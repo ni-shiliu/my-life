@@ -29,7 +29,8 @@ export function useAuth() {
     errorMessage.value = ''
     try {
       await userStore.register(phone, password, nickName)
-      router.push('/')
+      const redirect = (router.currentRoute.value.query.redirect as string) || '/'
+      router.push(redirect)
     } catch (e: any) {
       errorMessage.value = e.message || '注册失败'
       showToast(errorMessage.value, 'error')

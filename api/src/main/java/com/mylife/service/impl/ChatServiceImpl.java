@@ -43,43 +43,63 @@ public class ChatServiceImpl implements IChatService {
 
     @Override
     public SseEmitter chat(Long userId, String agentUuid, String message, ChatSceneEnum scene) {
-        SseEmitter emitter = new SseEmitter(SSE_TIMEOUT_MS);
-        emitter.onCompletion(() -> log.info("SSE完成：userId={}, agentUuid={}", userId, agentUuid));
-        emitter.onTimeout(() -> log.warn("SSE超时：userId={}, agentUuid={}", userId, agentUuid));
-
         ChatSceneEnum effectiveScene = scene != null ? scene : ChatSceneEnum.PUBLISHED;
+        SseEmitter emitter = buildEmitter("userId=" + userId + ", agentUuid=" + agentUuid);
         log.info("chat 开始：userId={}, agentUuid={}, scene={}", userId, agentUuid, effectiveScene);
 
         TeacherHarness harness = harnessRegistry.getOrCreate(userId, agentUuid, effectiveScene);
         log.info("harness 获取完成：key={}", harness.getHarnessKey());
 
+        runHarnessAsync(harness, message, emitter);
+        return emitter;
+    }
+
+    @Override
+    public SseEmitter chatGuest(String guestId, String agentUuid, String message) {
+        SseEmitter emitter = buildEmitter("guestId=" + guestId + ", agentUuid=" + agentUuid);
+        log.info("chatGuest 开始：guestId={}, agentUuid={}", guestId, agentUuid);
+
+        TeacherHarness harness = harnessRegistry.getOrCreateGuest(guestId, agentUuid);
+        log.info("访客 harness 获取完成：key={}", harness.getHarnessKey());
+
+        runHarnessAsync(harness, message, emitter);
+        return emitter;
+    }
+
+    private SseEmitter buildEmitter(String logCtx) {
+        SseEmitter emitter = new SseEmitter(SSE_TIMEOUT_MS);
+        emitter.onCompletion(() -> log.info("SSE完成：{}", logCtx));
+        emitter.onTimeout(() -> log.warn("SSE超时：{}", logCtx));
+        return emitter;
+    }
+
+    private void runHarnessAsync(TeacherHarness harness, String message, SseEmitter emitter) {
         SecurityContext context = SecurityContextHolder.getContext();
         Authentication authentication = context.getAuthentication();
+        executor.submit(() -> dispatchHarness(harness, message, emitter, authentication));
+    }
 
-        executor.submit(() -> {
-            SecurityContext asyncContext = SecurityContextHolder.createEmptyContext();
-            asyncContext.setAuthentication(authentication);
-            SecurityContextHolder.setContext(asyncContext);
-            try {
-                log.info("harness.chat 开始执行：key={}", harness.getHarnessKey());
-                harness.chat(message, emitter);
-                log.info("harness.chat 执行完成：key={}", harness.getHarnessKey());
-            } catch (BizException e) {
-                log.error("harness.chat 业务异常：key={}, code={}, msg={}", harness.getHarnessKey(), e.getCode(), e.getMessage());
-                SseEventHelper.emitEvent(emitter, "ERROR",
-                        SseEventHelper.buildErrorPayload(e.getCode(), e.getMessage(), true));
-                emitter.complete();
-            } catch (Exception e) {
-                log.error("harness.chat 系统异常：key={}, error={}", harness.getHarnessKey(), e.getMessage(), e);
-                SseEventHelper.emitEvent(emitter, "ERROR",
-                        SseEventHelper.buildErrorPayload(ErrorCode.LLM_ERROR.getCode(), "AI服务暂时不可用", true));
-                emitter.complete();
-            } finally {
-                SecurityContextHolder.clearContext();
-            }
-        });
-
-        return emitter;
+    private void dispatchHarness(TeacherHarness harness, String message, SseEmitter emitter, Authentication authentication) {
+        SecurityContext asyncContext = SecurityContextHolder.createEmptyContext();
+        asyncContext.setAuthentication(authentication);
+        SecurityContextHolder.setContext(asyncContext);
+        try {
+            log.info("harness.chat 开始执行：key={}", harness.getHarnessKey());
+            harness.chat(message, emitter);
+            log.info("harness.chat 执行完成：key={}", harness.getHarnessKey());
+        } catch (BizException e) {
+            log.error("harness.chat 业务异常：key={}, code={}, msg={}", harness.getHarnessKey(), e.getCode(), e.getMessage());
+            SseEventHelper.emitEvent(emitter, "ERROR",
+                    SseEventHelper.buildErrorPayload(e.getCode(), e.getMessage(), true));
+            emitter.complete();
+        } catch (Exception e) {
+            log.error("harness.chat 系统异常：key={}, error={}", harness.getHarnessKey(), e.getMessage(), e);
+            SseEventHelper.emitEvent(emitter, "ERROR",
+                    SseEventHelper.buildErrorPayload(ErrorCode.LLM_ERROR.getCode(), "AI服务暂时不可用", true));
+            emitter.complete();
+        } finally {
+            SecurityContextHolder.clearContext();
+        }
     }
 
     @Override

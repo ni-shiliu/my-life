@@ -40,3 +40,7 @@ export function removeAgentApi(agentUuid: string) {
 export function listAvailableAgentApi(data: { name?: string; page: number; size: number }) {
   return request.post<BaseResult<PageResult<AgentDTO>>>('/v1/agent/available', data)
 }
+
+export function getPublicAgentApi(uuid: string) {
+  return request.get<BaseResult<AgentDTO>>(`/v1/agent/public/${uuid}`)
+}

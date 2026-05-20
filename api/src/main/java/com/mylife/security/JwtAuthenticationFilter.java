@@ -33,7 +33,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         if (StringUtils.hasText(token)) {
             try {
                 JwtClaims claims = jwtTokenProvider.validate(token);
-                LoginUser loginUser = new LoginUser(claims.getUserId());
+                LoginUser loginUser = buildLoginUser(claims);
                 UsernamePasswordAuthenticationToken authentication =
                         new UsernamePasswordAuthenticationToken(loginUser, null, null);
                 SecurityContextHolder.getContext().setAuthentication(authentication);
@@ -43,6 +43,13 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             }
         }
         filterChain.doFilter(request, response);
+    }
+
+    private LoginUser buildLoginUser(JwtClaims claims) {
+        if ("guest".equals(claims.getType())) {
+            return LoginUser.ofGuest(claims.getGuestId());
+        }
+        return LoginUser.ofUser(claims.getUserId());
     }
 
     private String extractToken(HttpServletRequest request) {

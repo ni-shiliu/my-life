@@ -70,16 +70,14 @@ public class TeacherHarness {
             lastActiveAt = Instant.now();
             sseHook.setEmitter(emitter);
 
-            if (userId != null) {
-                saveMessage(ChatRoleEnum.USER, message, null);
-            }
+            saveMessage(ChatRoleEnum.USER, message, null);
 
             Msg userMsg = Msg.builder().role(MsgRole.USER).textContent(message).build();
             Msg response = agent.call(userMsg).block();
 
             String finalAnswer = extractTextContent(response);
 
-            if (userId != null && finalAnswer != null && !finalAnswer.isBlank()) {
+            if (finalAnswer != null && !finalAnswer.isBlank()) {
                 saveMessage(ChatRoleEnum.ASSISTANT, finalAnswer, null);
             }
 
@@ -116,6 +114,10 @@ public class TeacherHarness {
      * 回收前持久化记忆到DB。
      */
     public void persistBeforeRecycle() {
+        if (roomId == null) {
+            log.info("访客态跳过回收持久化：key={}", harnessKey);
+            return;
+        }
         memory.persistBeforeRecycle();
         log.info("Harness回收持久化：key={}", harnessKey);
     }
@@ -133,6 +135,9 @@ public class TeacherHarness {
     }
 
     private void saveMessage(ChatRoleEnum role, String content, String toolName) {
+        if (roomId == null) {
+            return;
+        }
         ChatMessageDO msg = new ChatMessageDO();
         msg.setMessageId(java.util.UUID.randomUUID().toString());
         msg.setRoomId(roomId);

@@ -10,6 +10,8 @@ public interface IChatService {
 
     SseEmitter chat(Long userId, String agentUuid, String message, ChatSceneEnum scene);
 
+    SseEmitter chatGuest(String guestId, String agentUuid, String message);
+
     String ensureRoom(Long userId, String agentUuid, ChatSceneEnum scene);
 
     List<ChatMessageDTO> getHistory(Long userId, String roomId);

@@ -8,6 +8,7 @@ import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
+import org.springframework.util.StringUtils;
 
 import javax.crypto.SecretKey;
 import java.nio.charset.StandardCharsets;
@@ -16,21 +17,41 @@ import java.util.Date;
 @Component
 public class JwtTokenProvider {
 
+    private static final String TYPE_ACCESS = "access";
+
+    private static final String TYPE_GUEST = "guest";
+
+    private static final String CLAIM_TYPE = "type";
+
     @Value("${jwt.secret}")
     private String secret;
 
     @Value("${jwt.expire-seconds}")
     private long expireSeconds;
 
+    @Value("${guest.token-expire-seconds}")
+    private long guestExpireSeconds;
+
     public String generateToken(Long userId) {
         Date now = new Date();
-        Date expiryDate = new Date(now.getTime() + expireSeconds * 1000);
-
+        Date expiry = new Date(now.getTime() + expireSeconds * 1000);
         return Jwts.builder()
                 .subject(userId.toString())
-                .claim("type", "access")
+                .claim(CLAIM_TYPE, TYPE_ACCESS)
                 .issuedAt(now)
-                .expiration(expiryDate)
+                .expiration(expiry)
+                .signWith(getSigningKey())
+                .compact();
+    }
+
+    public String generateGuestToken(String guestId) {
+        Date now = new Date();
+        Date expiry = new Date(now.getTime() + guestExpireSeconds * 1000);
+        return Jwts.builder()
+                .subject(guestId)
+                .claim(CLAIM_TYPE, TYPE_GUEST)
+                .issuedAt(now)
+                .expiration(expiry)
                 .signWith(getSigningKey())
                 .compact();
     }
@@ -42,17 +63,7 @@ public class JwtTokenProvider {
                     .build()
                     .parseSignedClaims(token)
                     .getPayload();
-
-            String type = claims.get("type", String.class);
-            if (!"access".equals(type)) {
-                throw new BizException(ErrorCode.TOKEN_INVALID.getCode(), ErrorCode.TOKEN_INVALID.getMessage());
-            }
-
-            return new JwtClaims(
-                    Long.parseLong(claims.getSubject()),
-                    claims.getIssuedAt(),
-                    claims.getExpiration()
-            );
+            return buildJwtClaims(claims);
         } catch (ExpiredJwtException e) {
             throw new BizException(ErrorCode.TOKEN_EXPIRED.getCode(), ErrorCode.TOKEN_EXPIRED.getMessage());
         } catch (BizException e) {
@@ -60,6 +71,31 @@ public class JwtTokenProvider {
         } catch (Exception e) {
             throw new BizException(ErrorCode.TOKEN_INVALID.getCode(), ErrorCode.TOKEN_INVALID.getMessage());
         }
+    }
+
+    private JwtClaims buildJwtClaims(Claims claims) {
+        String type = claims.get(CLAIM_TYPE, String.class);
+        if (TYPE_ACCESS.equals(type)) {
+            return JwtClaims.builder()
+                    .type(TYPE_ACCESS)
+                    .userId(Long.parseLong(claims.getSubject()))
+                    .issuedAt(claims.getIssuedAt())
+                    .expiration(claims.getExpiration())
+                    .build();
+        }
+        if (TYPE_GUEST.equals(type)) {
+            String guestId = claims.getSubject();
+            if (!StringUtils.hasText(guestId)) {
+                throw new BizException(ErrorCode.TOKEN_INVALID.getCode(), ErrorCode.TOKEN_INVALID.getMessage());
+            }
+            return JwtClaims.builder()
+                    .type(TYPE_GUEST)
+                    .guestId(guestId)
+                    .issuedAt(claims.getIssuedAt())
+                    .expiration(claims.getExpiration())
+                    .build();
+        }
+        throw new BizException(ErrorCode.TOKEN_INVALID.getCode(), ErrorCode.TOKEN_INVALID.getMessage());
     }
 
     private SecretKey getSigningKey() {

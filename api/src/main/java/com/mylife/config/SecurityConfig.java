@@ -29,6 +29,8 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .dispatcherTypeMatchers(DispatcherType.ASYNC).permitAll()
                         .requestMatchers("/v1/user/save", "/v1/user/login").permitAll()
+                        .requestMatchers(org.springframework.http.HttpMethod.GET, "/v1/chat/guest/token").permitAll()
+                        .requestMatchers(org.springframework.http.HttpMethod.GET, "/v1/agent/public/*").permitAll()
                         .requestMatchers(org.springframework.http.HttpMethod.POST, "/v1/agent/published").permitAll()
                         .anyRequest().authenticated()
                 )

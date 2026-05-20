@@ -17,7 +17,7 @@
 
       <p class="switch-link">
         还没有账号？
-        <router-link to="/register">去注册</router-link>
+        <router-link :to="{ name: 'Register', query: $route.query }">去注册</router-link>
       </p>
     </div>
   </AuthLayout>

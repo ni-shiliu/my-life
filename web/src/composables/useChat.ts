@@ -1,8 +1,10 @@
 import { ref, type ComputedRef, type Ref } from 'vue'
+import { useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user'
 import { useGuestAuth } from '@/composables/useGuestAuth'
 import { clearChatHistoryApi, clearMemoryApi, ensureChatRoomApi, getChatHistoryApi } from '@/api/chat'
-import { getToken } from '@/utils/storage'
+import { clearToken, getToken } from '@/utils/storage'
+import { showToast } from '@/components/auth/toast-state'
 import type { ChatMessage, ChatScene, StreamChunkPayload, StreamEndPayload, ErrorPayload } from '@/types/chat'
 
 export function useChat(agentUuid: Ref<string | undefined>, scene?: Ref<ChatScene | undefined> | ComputedRef<ChatScene | undefined>) {
@@ -13,7 +15,8 @@ export function useChat(agentUuid: Ref<string | undefined>, scene?: Ref<ChatScen
   const roomId = ref<string | null>(null)
 
   const userStore = useUserStore()
-  const { getOrFetchToken } = useGuestAuth()
+  const router = useRouter()
+  const { getOrFetchToken, clearGuestToken, fetchGuestToken } = useGuestAuth()
 
   function getApiBaseUrl(): string {
     return import.meta.env.VITE_API_BASE_URL || window.location.origin
@@ -42,15 +45,7 @@ export function useChat(agentUuid: Ref<string | undefined>, scene?: Ref<ChatScen
     error.value = ''
 
     try {
-      const token = await resolveToken()
-      const response = await fetch(`${getApiBaseUrl()}/v1/chat/send`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({ agentUuid: agentUuid.value, message: text, scene: scene?.value })
-      })
+      const response = await postChatSend(text)
 
       if (!response.ok) {
         throw new Error(`请求失败: ${response.status}`)
@@ -93,6 +88,48 @@ export function useChat(agentUuid: Ref<string | undefined>, scene?: Ref<ChatScen
       }
     } finally {
       streaming.value = false
+    }
+  }
+
+  async function postChatSend(text: string): Promise<Response> {
+    const body = JSON.stringify({ agentUuid: agentUuid.value, message: text, scene: scene?.value })
+    const firstToken = await resolveToken()
+    const firstResp = await doFetch(firstToken, body)
+    if (firstResp.status !== 401) {
+      return firstResp
+    }
+    const refreshed = await refreshTokenAfterUnauthorized()
+    if (refreshed === null) {
+      return firstResp
+    }
+    return doFetch(refreshed, body)
+  }
+
+  function doFetch(token: string, body: string): Promise<Response> {
+    return fetch(`${getApiBaseUrl()}/v1/chat/send`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body
+    })
+  }
+
+  async function refreshTokenAfterUnauthorized(): Promise<string | null> {
+    if (userStore.isLoggedIn) {
+      // 用户态 token 失效：清掉用户态并跳登录，不再自动重试
+      clearToken()
+      userStore.resetUser()
+      showToast('登录已失效，请重新登录', 'error')
+      router.push({ path: '/login', query: { redirect: router.currentRoute.value.fullPath } })
+      return null
+    }
+    clearGuestToken()
+    try {
+      return await fetchGuestToken()
+    } catch {
+      return null
     }
   }
 

@@ -1,6 +1,8 @@
 package com.mylife.controller;
 
 import com.mylife.common.BaseResult;
+import com.mylife.common.BizException;
+import com.mylife.common.ErrorCode;
 import com.mylife.dto.ChatMessageDTO;
 import com.mylife.dto.ChatSendDTO;
 import com.mylife.enums.ChatSceneEnum;
@@ -25,11 +27,36 @@ public class ChatController {
 
     @PostMapping("/send")
     public SseEmitter send(@Valid @RequestBody ChatSendDTO sendDTO) {
+        if (SecurityUtils.isGuest()) {
+            return sendAsGuest(sendDTO);
+        }
+        return sendAsUser(sendDTO);
+    }
+
+    private SseEmitter sendAsUser(ChatSendDTO sendDTO) {
         Long userId = SecurityUtils.getUserId();
-        log.info("chat send 请求：userId={}, agentUuid={}, scene={}, message={}",
-                userId, sendDTO.getAgentUuid(), sendDTO.getScene(),
-                sendDTO.getMessage().length() > 50 ? sendDTO.getMessage().substring(0, 50) + "..." : sendDTO.getMessage());
+        log.info("chat send 请求：userId={}, agentUuid={}, scene={}, messagePreview={}",
+                userId, sendDTO.getAgentUuid(), sendDTO.getScene(), preview(sendDTO.getMessage()));
         return chatService.chat(userId, sendDTO.getAgentUuid(), sendDTO.getMessage(), sendDTO.getScene());
+    }
+
+    private SseEmitter sendAsGuest(ChatSendDTO sendDTO) {
+        ChatSceneEnum scene = sendDTO.getScene();
+        if (scene != null && scene != ChatSceneEnum.PUBLISHED) {
+            throw new BizException(ErrorCode.PARAM_ILLEGAL.getCode(), "访客仅支持已发布场景");
+        }
+        String guestId = SecurityUtils.getOptionalGuestId()
+                .orElseThrow(() -> new BizException(ErrorCode.TOKEN_INVALID.getCode(), "访客身份无效"));
+        log.info("chat send 访客请求：guestId={}, agentUuid={}, messagePreview={}",
+                guestId, sendDTO.getAgentUuid(), preview(sendDTO.getMessage()));
+        return chatService.chatGuest(guestId, sendDTO.getAgentUuid(), sendDTO.getMessage());
+    }
+
+    private String preview(String message) {
+        if (message == null) {
+            return "";
+        }
+        return message.length() > 50 ? message.substring(0, 50) + "..." : message;
     }
 
     @PostMapping("/room")

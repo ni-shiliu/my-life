@@ -32,7 +32,7 @@ const router = createRouter({
       path: '/chat/:agentId',
       name: 'Chat',
       component: () => import('@/views/chat/ChatView.vue'),
-      meta: { requiresAuth: false }
+      meta: { requiresAuth: false, allowBoth: true }
     }
   ]
 })
@@ -41,7 +41,7 @@ router.beforeEach((to, _from, next) => {
   const userStore = useUserStore()
   if (to.meta.requiresAuth && !userStore.isLoggedIn) {
     next({ name: 'Login', query: { redirect: to.fullPath } })
-  } else if (!to.meta.requiresAuth && userStore.isLoggedIn && to.name !== 'Chat') {
+  } else if (!to.meta.requiresAuth && !to.meta.allowBoth && userStore.isLoggedIn) {
     next({ name: 'Home' })
   } else {
     next()

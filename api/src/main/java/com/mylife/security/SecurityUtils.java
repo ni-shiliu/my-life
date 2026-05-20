@@ -9,6 +9,10 @@ import java.util.Optional;
 
 public class SecurityUtils {
 
+    private static final String USER_KEY_PREFIX = "u:";
+
+    private static final String GUEST_KEY_PREFIX = "g:";
+
     private SecurityUtils() {
     }
 
@@ -28,5 +32,29 @@ public class SecurityUtils {
         return getOptionalUser()
                 .map(LoginUser::getUserId)
                 .orElseThrow(() -> new BizException(ErrorCode.TOKEN_INVALID.getCode(), "获取用户ID失败"));
+    }
+
+    public static Optional<Long> getOptionalUserId() {
+        return getOptionalUser().map(LoginUser::getUserId);
+    }
+
+    public static Optional<String> getOptionalGuestId() {
+        return getOptionalUser().map(LoginUser::getGuestId);
+    }
+
+    public static boolean isGuest() {
+        return getOptionalUser().map(LoginUser::isGuest).orElse(false);
+    }
+
+    public static String getPrincipalKey() {
+        LoginUser loginUser = getOptionalUser()
+                .orElseThrow(() -> new BizException(ErrorCode.TOKEN_INVALID.getCode(), "未登录"));
+        if (loginUser.isGuest()) {
+            return GUEST_KEY_PREFIX + loginUser.getGuestId();
+        }
+        if (loginUser.getUserId() == null) {
+            throw new BizException(ErrorCode.TOKEN_INVALID.getCode(), "获取用户ID失败");
+        }
+        return USER_KEY_PREFIX + loginUser.getUserId();
     }
 }

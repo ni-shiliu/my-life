@@ -3,6 +3,7 @@ package com.mylife.service;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.mylife.dto.AgentDTO;
 import com.mylife.dto.AgentPageQueryDTO;
+import com.mylife.dto.AgentPublicDTO;
 import com.mylife.dto.AgentSaveDTO;
 
 import java.util.List;
@@ -14,6 +15,8 @@ public interface IAgentService {
     void delete(Long userId, String uuid);
 
     AgentDTO get(Long userId, String uuid);
+
+    AgentPublicDTO getPublishedAgentByUuid(String uuid);
 
     List<AgentDTO> list(Long userId);
 

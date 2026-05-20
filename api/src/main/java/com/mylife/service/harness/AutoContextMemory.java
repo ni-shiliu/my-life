@@ -216,6 +216,10 @@ public class AutoContextMemory implements Memory {
     }
 
     private void persistMemoryToDb(String content, int messageCount) {
+        if (roomId == null) {
+            log.debug("访客态跳过记忆持久化：agentId={}", agentId);
+            return;
+        }
         ContextMemoryDO memoryDO = new ContextMemoryDO();
         memoryDO.setRoomId(roomId);
         memoryDO.setUserId(userId);

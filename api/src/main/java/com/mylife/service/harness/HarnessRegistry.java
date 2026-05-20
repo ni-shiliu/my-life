@@ -7,6 +7,7 @@ import com.mylife.entity.AgentDO;
 import com.mylife.entity.ChatRoomDO;
 import com.mylife.entity.KnowledgeBaseDO;
 import com.mylife.entity.ChatMessageDO;
+import com.mylife.enums.AgentStatusEnum;
 import com.mylife.enums.ChatRoleEnum;
 import com.mylife.enums.ChatSceneEnum;
 import com.mylife.mapper.AgentMapper;
@@ -43,6 +44,8 @@ import java.util.concurrent.ConcurrentHashMap;
 public class HarnessRegistry {
 
     private static final int MAX_HISTORY = 20;
+
+    private static final String GUEST_KEY_PREFIX = "g:";
 
     private final ConcurrentHashMap<String, TeacherHarness> harnessMap = new ConcurrentHashMap<>();
 
@@ -107,8 +110,35 @@ public class HarnessRegistry {
         }
     }
 
+    /**
+     * 获取或创建访客 TeacherHarness。线程安全（computeIfAbsent）。
+     * 仅支持 PUBLISHED 场景，不持久化。
+     */
+    public TeacherHarness getOrCreateGuest(String guestId, String agentUuid) {
+        String key = buildGuestKey(guestId, agentUuid);
+        return harnessMap.computeIfAbsent(key, k -> {
+            log.info("创建访客TeacherHarness：key={}", k);
+            return createGuestHarness(k, guestId, agentUuid);
+        });
+    }
+
+    /**
+     * 销毁并移除访客 TeacherHarness 实例（不持久化记忆，访客态本就不落库）。
+     */
+    public void removeGuest(String guestId, String agentUuid) {
+        String key = buildGuestKey(guestId, agentUuid);
+        TeacherHarness harness = harnessMap.remove(key);
+        if (harness != null) {
+            log.info("销毁访客TeacherHarness：key={}", key);
+        }
+    }
+
     private String buildKey(Long userId, String agentUuid, ChatSceneEnum scene) {
         return userId + "_" + agentUuid + "_" + scene.name();
+    }
+
+    private String buildGuestKey(String guestId, String agentUuid) {
+        return GUEST_KEY_PREFIX + guestId + "_" + agentUuid + "_" + ChatSceneEnum.PUBLISHED.name();
     }
 
     private TeacherHarness createHarness(String key, Long userId, String agentUuid, ChatSceneEnum scene) {
@@ -132,7 +162,48 @@ public class HarnessRegistry {
         SseStreamingHook sseHook = new SseStreamingHook();
         ContextCompressionHook compressionHook = new ContextCompressionHook(memory);
 
-        ReActAgent.Builder agentBuilder = ReActAgent.builder()
+        ReActAgent reactAgent = buildReActAgent(key, agent, model, toolkit, memory, sseHook, compressionHook, toolContext);
+
+        return new TeacherHarness(
+                key, userId, agentUuid, scene, room.getId(), reactAgent, memory,
+                chatMessageMapper, sseHook, compressionHook);
+    }
+
+    /**
+     * 访客模式创建：不持久化、仅 PUBLISHED 场景、agent 必须已发布。
+     */
+    private TeacherHarness createGuestHarness(String key, String guestId, String agentUuid) {
+        AgentDO agent = loadAndValidatePublishedAgent(agentUuid);
+
+        DashScopeChatModel model = buildStreamingModel();
+        DashScopeChatModel compactModel = buildCompactModel();
+
+        // 访客态：roomId / userId 均为 null，AutoContextMemory 内存压缩照常，持久化自动跳过
+        AutoContextMemory memory = new AutoContextMemory(
+                compactModel, contextMemoryMapper, null, null, agentUuid);
+
+        Toolkit toolkit = buildToolkit();
+        ToolExecutionContext toolContext = buildGuestToolExecutionContext(guestId, agentUuid);
+
+        SseStreamingHook sseHook = new SseStreamingHook();
+        ContextCompressionHook compressionHook = new ContextCompressionHook(memory);
+
+        ReActAgent reactAgent = buildReActAgent(key, agent, model, toolkit, memory, sseHook, compressionHook, toolContext);
+
+        return new TeacherHarness(
+                key, null, agentUuid, ChatSceneEnum.PUBLISHED, null, reactAgent, memory,
+                chatMessageMapper, sseHook, compressionHook);
+    }
+
+    private ReActAgent buildReActAgent(String key,
+                                       AgentDO agent,
+                                       DashScopeChatModel model,
+                                       Toolkit toolkit,
+                                       AutoContextMemory memory,
+                                       SseStreamingHook sseHook,
+                                       ContextCompressionHook compressionHook,
+                                       ToolExecutionContext toolContext) {
+        ReActAgent.Builder builder = ReActAgent.builder()
                 .name("Teacher_" + key)
                 .sysPrompt(agent.getSystemPrompt())
                 .model(model)
@@ -143,21 +214,14 @@ public class HarnessRegistry {
                 .hooks(List.of(sseHook, compressionHook))
                 .toolExecutionContext(toolContext);
 
-        // 如果 Agent 绑定了知识库，启用 Agentic RAG
         String externalId = resolveKbExternalId(agent.getKnowledgeBaseId());
         Knowledge knowledge = buildKnowledge(externalId);
         if (knowledge != null) {
-            agentBuilder.knowledge(knowledge)
-                    .ragMode(RAGMode.AGENTIC);
+            builder.knowledge(knowledge).ragMode(RAGMode.AGENTIC);
             log.info("Agent已绑定知识库，启用Agentic RAG：agentUuid={}, knowledgeBaseId={}",
-                    agentUuid, agent.getKnowledgeBaseId());
+                    agent.getUuid(), agent.getKnowledgeBaseId());
         }
-
-        ReActAgent reactAgent = agentBuilder.build();
-
-        return new TeacherHarness(
-                key, userId, agentUuid, scene, room.getId(), reactAgent, memory,
-                chatMessageMapper, sseHook, compressionHook);
+        return builder.build();
     }
 
     /**
@@ -196,6 +260,14 @@ public class HarnessRegistry {
         AgentDO agent = agentMapper.selectOne(wrapper);
         if (agent == null) {
             throw new BizException(ErrorCode.PARAM_ILLEGAL.getCode(), "智能体不存在");
+        }
+        return agent;
+    }
+
+    private AgentDO loadAndValidatePublishedAgent(String agentUuid) {
+        AgentDO agent = loadAndValidateAgent(agentUuid);
+        if (agent.getStatus() != AgentStatusEnum.PUBLISHED) {
+            throw new BizException(ErrorCode.PARAM_ILLEGAL.getCode(), "智能体未发布");
         }
         return agent;
     }
@@ -239,6 +311,7 @@ public class HarnessRegistry {
         return list;
     }
 
+    // TODO 后续注册工具时，依赖用户上下文的工具需检查 HarnessUserContext.isGuest()，访客模式直接返回提示
     private Toolkit buildToolkit() {
         Toolkit toolkit = new Toolkit();
         return toolkit;
@@ -246,7 +319,13 @@ public class HarnessRegistry {
 
     private ToolExecutionContext buildToolExecutionContext(Long userId, String agentUuid) {
         return ToolExecutionContext.builder()
-                .register(new HarnessUserContext(userId, agentUuid))
+                .register(HarnessUserContext.ofUser(userId, agentUuid))
+                .build();
+    }
+
+    private ToolExecutionContext buildGuestToolExecutionContext(String guestId, String agentUuid) {
+        return ToolExecutionContext.builder()
+                .register(HarnessUserContext.ofGuest(guestId, agentUuid))
                 .build();
     }
 }

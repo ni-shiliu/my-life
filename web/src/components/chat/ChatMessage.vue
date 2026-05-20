@@ -105,6 +105,10 @@ $radius-md: 12px;
   &--user {
     flex-direction: row-reverse;
 
+    .chat-msg-content {
+      justify-content: flex-end;
+    }
+
     .chat-msg-bubble {
       background: $primary;
       color: $primary-text;
@@ -166,10 +170,13 @@ $radius-md: 12px;
 }
 
 .chat-msg-content {
+  flex: 1;
   min-width: 0;
+  display: flex;
 }
 
 .chat-msg-bubble {
+  width: fit-content;
   padding: 10px 14px;
   font-size: 14px;
   line-height: 1.6;

@@ -8,7 +8,16 @@
           <span class="logo-text">my-life</span>
         </div>
         <div class="global-header-right">
-          <span v-if="!isLoggedIn" class="guest-badge">游客</span>
+          <template v-if="!isLoggedIn">
+            <span class="guest-badge">游客</span>
+            <button class="btn-unlock" @click="goLogin">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+                <path d="M7 11V7a5 5 0 0 1 9.9-1"/>
+              </svg>
+              <span>登录解锁完整体验</span>
+            </button>
+          </template>
           <div v-else class="user-pill" @click="handleLogout">
             <div class="user-avatar">{{ userAvatar }}</div>
             <span class="user-name">{{ userStore.userInfo?.nickName || '用户' }}</span>
@@ -61,31 +70,33 @@
           <span class="header-agent-name">{{ agentName }}</span>
         </div>
         <div class="header-actions">
-          <button class="btn-action" @click="menuOpen = !menuOpen" aria-label="更多操作">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-              <circle cx="12" cy="5" r="2"/>
-              <circle cx="12" cy="12" r="2"/>
-              <circle cx="12" cy="19" r="2"/>
-            </svg>
-          </button>
-          <div v-if="menuOpen" class="action-menu">
-            <button class="action-item" @click="handleClear">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <polyline points="3 6 5 6 21 6"/>
-                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+          <template v-if="isLoggedIn">
+            <button class="btn-action" @click="menuOpen = !menuOpen" aria-label="更多操作">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                <circle cx="12" cy="5" r="2"/>
+                <circle cx="12" cy="12" r="2"/>
+                <circle cx="12" cy="19" r="2"/>
               </svg>
-              清空聊天记录
             </button>
-            <button class="action-item" @click="handleClearMemory">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M12 2a10 10 0 1 0 10 10"/>
-                <path d="M12 2v10l6.93 4"/>
-              </svg>
-              清空记忆
-            </button>
-          </div>
+            <div v-if="menuOpen" class="action-menu">
+              <button class="action-item" @click="handleClear">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <polyline points="3 6 5 6 21 6"/>
+                  <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                </svg>
+                清空聊天记录
+              </button>
+              <button class="action-item" @click="handleClearMemory">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M12 2a10 10 0 1 0 10 10"/>
+                  <path d="M12 2v10l6.93 4"/>
+                </svg>
+                清空记忆
+              </button>
+            </div>
+          </template>
         </div>
-        <div v-if="menuOpen" class="action-menu-overlay" @click="menuOpen = false" />
+        <div v-if="menuOpen && isLoggedIn" class="action-menu-overlay" @click="menuOpen = false" />
       </div>
     </header>
 
@@ -202,7 +213,7 @@ import { useRouter, useRoute } from 'vue-router'
 import { useUserStore } from '@/stores/user'
 import { useAuth } from '@/composables/useAuth'
 import { useChat } from '@/composables/useChat'
-import { getAgentApi, listAvailableAgentApi, removeAgentApi } from '@/api/agent'
+import { getAgentApi, getPublicAgentApi, listAvailableAgentApi, removeAgentApi } from '@/api/agent'
 import type { AgentDTO } from '@/types/agent'
 import ChatMessage from '@/components/chat/ChatMessage.vue'
 import ChatInput from '@/components/chat/ChatInput.vue'
@@ -315,7 +326,9 @@ watch(() => messages.value.length, (len) => {
 })
 
 onMounted(async () => {
-  userStore.fetchUserInfo()
+  if (isLoggedIn.value) {
+    userStore.fetchUserInfo()
+  }
   agentUuid.value = route.params.agentId as string
   if (!agentUuid.value) {
     showToast('智能体不存在', 'error')
@@ -326,7 +339,9 @@ onMounted(async () => {
   await loadAgentInfo(agentUuid.value)
   loading.value = false
   loadHistory()
-  loadAvailableAgents()
+  if (isLoggedIn.value) {
+    loadAvailableAgents()
+  }
 })
 
 watch(() => route.params.agentId, async (newId) => {
@@ -340,7 +355,9 @@ watch(() => route.params.agentId, async (newId) => {
 
 async function loadAgentInfo(uuid: string) {
   try {
-    const { data } = await getAgentApi(uuid)
+    const { data } = isLoggedIn.value
+      ? await getAgentApi(uuid)
+      : await getPublicAgentApi(uuid)
     if (data?.data) {
       agentName.value = data.data.name
       agentDesc.value = data.data.description || ''
@@ -354,6 +371,10 @@ async function loadAgentInfo(uuid: string) {
 
 function goBack() {
   router.push('/')
+}
+
+function goLogin() {
+  router.push({ path: '/login', query: { redirect: route.fullPath } })
 }
 
 async function handleLogout() {
@@ -387,7 +408,7 @@ async function loadAvailableAgents() {
 }
 
 async function switchAgent(agent: AgentDTO) {
-  if (agent.uuid === agentUuid.value) return
+  if (!isLoggedIn.value || agent.uuid === agentUuid.value) return
   agentUuid.value = agent.uuid
   agentName.value = agent.name
   agentDesc.value = agent.description || ''
@@ -536,6 +557,28 @@ $header-h: 56px;
   background: $primary-soft;
   color: $primary;
   font-weight: 500;
+  margin-right: 10px;
+}
+
+.btn-unlock {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border: none;
+  border-radius: 999px;
+  background: $primary;
+  color: $primary-text;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: opacity $transition, transform $transition;
+  box-shadow: 0 2px 6px rgba(99, 102, 241, 0.25);
+
+  &:hover { opacity: 0.92; }
+  &:active { transform: scale(0.98); }
+
+  svg { flex-shrink: 0; }
 }
 
 .user-pill {
@@ -1089,5 +1132,7 @@ $header-h: 56px;
   .welcome-suggestions { max-width: 100%; }
   .logo-text { display: none; }
   .user-name { display: none; }
+  .btn-unlock span { display: none; }
+  .btn-unlock { padding: 6px 10px; }
 }
 </style>

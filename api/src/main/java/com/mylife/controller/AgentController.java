@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.mylife.common.BaseResult;
 import com.mylife.dto.AgentDTO;
 import com.mylife.dto.AgentPageQueryDTO;
+import com.mylife.dto.AgentPublicDTO;
 import com.mylife.dto.AgentSaveDTO;
 import com.mylife.security.SecurityUtils;
 import com.mylife.service.IAgentService;
@@ -36,6 +37,11 @@ public class AgentController {
     @GetMapping("/get/{uuid}")
     public BaseResult<AgentDTO> get(@PathVariable String uuid) {
         return BaseResult.success(agentService.get(SecurityUtils.getUserId(), uuid));
+    }
+
+    @GetMapping("/public/{uuid}")
+    public BaseResult<AgentPublicDTO> getPublic(@PathVariable String uuid) {
+        return BaseResult.success(agentService.getPublishedAgentByUuid(uuid));
     }
 
     @PostMapping("/list")
