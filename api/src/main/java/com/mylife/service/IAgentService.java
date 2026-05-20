@@ -31,4 +31,6 @@ public interface IAgentService {
     IPage<AgentDTO> listAvailablePage(Long userId, AgentPageQueryDTO queryDTO);
 
     void publish(Long userId, String uuid);
+
+    void unpublish(Long userId, String uuid);
 }

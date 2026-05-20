@@ -216,6 +216,19 @@ public class AgentServiceImpl implements IAgentService {
         ));
     }
 
+    @Override
+    public void unpublish(Long userId, String uuid) {
+        AgentDO agentDO = getAndCheckOwner(userId, uuid);
+        if (agentDO.getStatus() != AgentStatusEnum.PUBLISHED) {
+            throw new BizException(ErrorCode.PARAM_ILLEGAL.getCode(), "仅已发布智能体可取消发布");
+        }
+        agentDO.setStatus(AgentStatusEnum.DRAFT);
+        agentMapper.updateById(agentDO);
+        log.info("智能体取消发布：{}", com.alibaba.fastjson2.JSON.toJSONString(
+                java.util.Map.of("uuid", uuid, "userId", userId)
+        ));
+    }
+
     private AgentDO loadAgentByUuid(String uuid) {
         LambdaQueryWrapper<AgentDO> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(AgentDO::getUuid, uuid)

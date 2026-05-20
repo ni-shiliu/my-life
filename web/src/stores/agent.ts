@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import type { AgentDTO, AgentSaveDTO } from '@/types/agent'
-import { saveAgentApi, deleteAgentApi, listAgentApi, listAgentPageApi, publishAgentApi } from '@/api/agent'
+import { saveAgentApi, deleteAgentApi, listAgentApi, listAgentPageApi, publishAgentApi, unpublishAgentApi } from '@/api/agent'
 
 export const useAgentStore = defineStore('agent', () => {
   const agents = ref<AgentDTO[]>([])
@@ -55,5 +55,10 @@ export const useAgentStore = defineStore('agent', () => {
     await loadAgentsPage()
   }
 
-  return { agents, loading, currentPage, totalPages, pageSize, loadAgents, loadAgentsPage, saveAgent, deleteAgent, publishAgent }
+  async function unpublishAgent(uuid: string) {
+    await unpublishAgentApi(uuid)
+    await loadAgentsPage()
+  }
+
+  return { agents, loading, currentPage, totalPages, pageSize, loadAgents, loadAgentsPage, saveAgent, deleteAgent, publishAgent, unpublishAgent }
 })

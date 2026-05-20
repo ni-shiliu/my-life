@@ -85,6 +85,12 @@ public class AgentController {
         return BaseResult.success(null);
     }
 
+    @PostMapping("/unpublish")
+    public BaseResult<Void> unpublish(@RequestParam String uuid) {
+        agentService.unpublish(SecurityUtils.getUserId(), uuid);
+        return BaseResult.success(null);
+    }
+
     private BaseResult<Map<String, Object>> buildPageResult(IPage<AgentDTO> mpPage) {
         Map<String, Object> result = new HashMap<>();
         result.put("records", mpPage.getRecords());

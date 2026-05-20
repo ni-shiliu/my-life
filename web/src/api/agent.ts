@@ -21,6 +21,10 @@ export function publishAgentApi(uuid: string) {
   return request.post<BaseResult<void>>('/v1/agent/publish', null, { params: { uuid } })
 }
 
+export function unpublishAgentApi(uuid: string) {
+  return request.post<BaseResult<void>>('/v1/agent/unpublish', null, { params: { uuid } })
+}
+
 export function queryPublishedAgentApi(data: { name?: string; page: number; size: number }) {
   return request.post<BaseResult<PageResult<AgentDTO>>>('/v1/agent/published', data)
 }

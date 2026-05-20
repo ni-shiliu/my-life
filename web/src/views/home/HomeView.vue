@@ -170,39 +170,63 @@
                   </h3>
                   <p class="card-desc">{{ agent.description }}</p>
                 </div>
-                <div class="card-actions" @click.stop>
-                  <button v-if="agent.status === 'PUBLISHED'" class="btn-ghost btn-sm" @click="startChat(agent)">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                      <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                <div class="card-actions card-actions-menu" @click.stop>
+                  <button class="btn-icon" @click="toggleAgentMenu(agent.uuid)" aria-label="更多操作">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                      <circle cx="5" cy="12" r="2"/>
+                      <circle cx="12" cy="12" r="2"/>
+                      <circle cx="19" cy="12" r="2"/>
                     </svg>
-                    对话
                   </button>
-                  <button v-if="agent.status === 'PUBLISHED'" class="btn-ghost btn-sm" @click="shareAgent(agent)" aria-label="分享">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                      <circle cx="18" cy="5" r="3"/>
-                      <circle cx="6" cy="12" r="3"/>
-                      <circle cx="18" cy="19" r="3"/>
-                      <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/>
-                      <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>
-                    </svg>
-                    分享
-                  </button>
-                  <button class="btn-ghost btn-sm" @click="openEditDialog(agent)" aria-label="编辑">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                      <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
-                      <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
-                    </svg>
-                    编辑
-                  </button>
-                  <button class="btn-ghost btn-sm btn-delete" @click="confirmDelete(agent)" aria-label="删除">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                      <polyline points="3 6 5 6 21 6"></polyline>
-                      <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-                      <line x1="10" y1="11" x2="10" y2="17"></line>
-                      <line x1="14" y1="11" x2="14" y2="17"></line>
-                    </svg>
-                    删除
-                  </button>
+                  <div v-if="openAgentMenu === agent.uuid" class="action-menu">
+                    <button v-if="agent.status === 'PUBLISHED'" class="action-item" @click="runAgentAction('chat', agent)">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                      </svg>
+                      对话
+                    </button>
+                    <button v-if="agent.status === 'PUBLISHED'" class="action-item" @click="runAgentAction('share', agent)">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="18" cy="5" r="3"/>
+                        <circle cx="6" cy="12" r="3"/>
+                        <circle cx="18" cy="19" r="3"/>
+                        <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/>
+                        <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>
+                      </svg>
+                      分享
+                    </button>
+                    <button class="action-item" @click="runAgentAction('edit', agent)">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                      </svg>
+                      编辑
+                    </button>
+                    <button v-if="agent.status === 'PUBLISHED'" class="action-item" @click="runAgentAction('unpublish', agent)">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M3 3l18 18"/>
+                        <path d="M10.5 10.677a2 2 0 0 0 2.823 2.823"/>
+                        <path d="M21 12c-2.4 4-6 6-9 6-1.106 0-2.184-.222-3.213-.625M6.7 6.71C4.605 7.945 2.79 9.836 1.5 12c2.4 4 6 6 9 6 .9 0 1.78-.155 2.61-.43"/>
+                      </svg>
+                      取消发布
+                    </button>
+                    <button v-else class="action-item" @click="runAgentAction('publish', agent)">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M5 12l5 5L20 7"/>
+                      </svg>
+                      发布
+                    </button>
+                    <button class="action-item action-item-danger" @click="runAgentAction('delete', agent)">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="3 6 5 6 21 6"></polyline>
+                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                        <line x1="10" y1="11" x2="10" y2="17"></line>
+                        <line x1="14" y1="11" x2="14" y2="17"></line>
+                      </svg>
+                      删除
+                    </button>
+                  </div>
+                  <div v-if="openAgentMenu === agent.uuid" class="action-menu-overlay" @click="openAgentMenu = ''" />
                 </div>
               </div>
             </div>
@@ -606,6 +630,7 @@ const showDeleteDialog = ref(false)
 const showEditDialog = ref(false)
 const showKbDialog = ref(false)
 const searchQuery = ref('')
+const openAgentMenu = ref('')
 const creating = ref(false)
 const deleting = ref(false)
 const savingEdit = ref(false)
@@ -753,6 +778,40 @@ const shareAgent = (agent: AgentDTO) => {
   }).catch(() => {
     showToast('复制失败，请手动复制', 'error')
   })
+}
+
+const toggleAgentMenu = (uuid: string) => {
+  openAgentMenu.value = openAgentMenu.value === uuid ? '' : uuid
+}
+
+type AgentMenuAction = 'chat' | 'share' | 'edit' | 'publish' | 'unpublish' | 'delete'
+
+const runAgentAction = (action: AgentMenuAction, agent: AgentDTO) => {
+  openAgentMenu.value = ''
+  if (action === 'chat') return startChat(agent)
+  if (action === 'share') return shareAgent(agent)
+  if (action === 'edit') return openEditDialog(agent)
+  if (action === 'publish') return publishAgent(agent)
+  if (action === 'unpublish') return unpublishAgent(agent)
+  if (action === 'delete') return confirmDelete(agent)
+}
+
+const publishAgent = async (agent: AgentDTO) => {
+  try {
+    await agentStore.publishAgent(agent.uuid)
+    showToast('发布成功', 'success')
+  } catch (e: any) {
+    showToast(e.message || '发布失败', 'error')
+  }
+}
+
+const unpublishAgent = async (agent: AgentDTO) => {
+  try {
+    await agentStore.unpublishAgent(agent.uuid)
+    showToast('已取消发布', 'success')
+  } catch (e: any) {
+    showToast(e.message || '取消发布失败', 'error')
+  }
 }
 
 const goToEdit = (agent: AgentDTO) => {
@@ -1335,6 +1394,76 @@ $transition: 150ms cubic-bezier(0.4, 0, 0.2, 1);
 .card-actions {
   display: flex;
   gap: 8px;
+}
+
+.card-actions-menu {
+  position: relative;
+  justify-content: flex-end;
+}
+
+.btn-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: 1px solid $border;
+  border-radius: 8px;
+  background: $surface;
+  color: $text-3;
+  cursor: pointer;
+  transition: border-color $transition, color $transition;
+
+  &:hover {
+    border-color: $text-3;
+    color: $text-1;
+  }
+}
+
+.action-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  min-width: 140px;
+  padding: 4px;
+  background: $surface;
+  border: 1px solid $border;
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+  z-index: 50;
+}
+
+.action-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 12px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: $text-1;
+  font-size: 13px;
+  cursor: pointer;
+  text-align: left;
+  transition: background $transition;
+
+  &:hover { background: rgba(0, 0, 0, 0.04); }
+
+  svg { flex-shrink: 0; color: $text-3; }
+}
+
+.action-item-danger {
+  color: $danger;
+  svg { color: $danger; }
+
+  &:hover { background: rgba(239, 68, 68, 0.08); }
+}
+
+.action-menu-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 49;
 }
 
 // ── Delete Dialog ──
